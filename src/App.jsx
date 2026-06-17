@@ -43,6 +43,7 @@ const App = () => {
   const [route, setRoute] = useState('dashboard');
   const [periodo, setPeriodo] = useState('m01');
   const [planId, setPlanId] = useState(null);
+  const [planPeriodo, setPlanPeriodo] = useState(null); // filtro de mês ao abrir Planejamentos
   const [alunoId, setAlunoId] = useState(null);
   // drill-down admin
   const [escolaId, setEscolaId] = useState(null);
@@ -60,8 +61,10 @@ const App = () => {
     clearDrill();
   };
   const sair = () => { logout(); setUser(null); };
-  const go = r => { setRoute(r); clearDrill(); };
+  const go = r => { setRoute(r); clearDrill(); setPlanPeriodo(null); };
   const openEscola = id => { if (id) setEscolaId(id); else go('admescolas'); };
+  // abre os Planejamentos já filtrados por um mês (vindo da tela de Períodos)
+  const irPlanejamentosPeriodo = pid => { clearDrill(); setPlanPeriodo(pid); setRoute('planejamentos'); };
 
   // boot: tenta restaurar a sessão (token salvo)
   useEffect(() => {
@@ -93,10 +96,10 @@ const App = () => {
     switch (route) {
       // gestor
       case 'dashboard': view = <GestorDashboard go={go} />; break;
-      case 'planejamentos': view = <Planejamentos go={go} openPlan={setPlanId} />; break;
+      case 'planejamentos': view = <Planejamentos go={go} openPlan={setPlanId} periodoInicial={planPeriodo} />; break;
       case 'habilidades': view = <HabilidadesBNCC />; break;
       case 'professores': view = <ProfessoresTurmas openAluno={setAlunoId} />; break;
-      case 'periodos': view = <Periodos />; break;
+      case 'periodos': view = <Periodos irParaPlanejamentos={irPlanejamentosPeriodo} />; break;
       // professor
       case 'painel': view = <ProfessorPainel go={go} />; break;
       case 'verificacao': view = <VerificacaoContinua openAluno={setAlunoId} />; break;

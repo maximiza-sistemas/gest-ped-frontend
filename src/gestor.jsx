@@ -134,11 +134,14 @@ export const GestorDashboard = ({ go }) => {
 };
 
 /* -------- Planejamentos -------- */
-export const Planejamentos = ({ go, openPlan }) => {
+export const Planejamentos = ({ go, openPlan, periodoInicial }) => {
   const D = DATA;
   const [novo, setNovo] = useState(false);
   const [editar, setEditar] = useState(null);
+  const [periodoSel, setPeriodoSel] = useState(periodoInicial || 'todos');
   const podeCriar = ['admin', 'secretaria'].includes(D.CURRENT_USER?.perfil);
+  const mesesComPlano = D.PERIODOS.filter(p => D.PLANEJAMENTOS.some(pl => pl.periodo === p.id));
+  const lista = D.PLANEJAMENTOS.filter(pl => periodoSel === 'todos' || pl.periodo === periodoSel);
   const anosTxt = pl => pl.anos && pl.anos.length ? pl.anos.map(a => D.anoNome(a)).join(', ') : 'Todas as séries';
   const statusBadge = s => s === 'ativo' ? ['badge-green', 'Ativo'] : s === 'arquivado' ? ['badge-gray', 'Arquivado'] : ['badge-blue', 'Concluído'];
   const excluir = async pl => {
@@ -156,6 +159,18 @@ export const Planejamentos = ({ go, openPlan }) => {
         actions={podeCriar ? <button className="btn btn-primary" onClick={() => setNovo(true)}><I name="plus" size={16} />Novo planejamento</button> : null}
       />
 
+      {D.PLANEJAMENTOS.length > 0 && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
+          <select className="input" style={{ maxWidth: 220 }} value={periodoSel} onChange={e => setPeriodoSel(e.target.value)}>
+            <option value="todos">Todos os meses</option>
+            {mesesComPlano.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
+          </select>
+          <span style={{ fontSize: 12.5, color: 'var(--text-3)' }}>
+            {lista.length} planejamento{lista.length === 1 ? '' : 's'}{periodoSel !== 'todos' ? ' · ' + D.periodoNome(periodoSel) : ''}
+          </span>
+        </div>
+      )}
+
       {D.PLANEJAMENTOS.length === 0 && !podeCriar ? (
         <div className="card card-pad" style={{ textAlign: 'center', padding: '54px 24px', color: 'var(--text-2)' }}>
           <div style={{ width: 56, height: 56, borderRadius: 14, background: 'var(--surface-3)', color: 'var(--text-3)', display: 'grid', placeItems: 'center', margin: '0 auto 16px' }}><I name="plan" size={28} /></div>
@@ -164,7 +179,7 @@ export const Planejamentos = ({ go, openPlan }) => {
         </div>
       ) : (
         <div className="grid" style={{ gridTemplateColumns: 'repeat(3,1fr)' }}>
-          {D.PLANEJAMENTOS.map(pl => {
+          {lista.map(pl => {
             const [scls, slbl] = statusBadge(pl.status);
             return (
               <div key={pl.id} className="card" style={{ cursor: 'pointer', transition: 'box-shadow .15s, transform .15s', overflow: 'hidden' }}
@@ -205,6 +220,12 @@ export const Planejamentos = ({ go, openPlan }) => {
               </div>
             );
           })}
+
+          {lista.length === 0 && (
+            <div className="card card-pad" style={{ color: 'var(--text-3)', fontSize: 13.5, gridColumn: '1 / -1' }}>
+              Nenhum planejamento{periodoSel !== 'todos' ? ' em ' + D.periodoNome(periodoSel) : ''}.
+            </div>
+          )}
 
           {podeCriar && (
             <button onClick={() => setNovo(true)} className="card" style={{ border: '1.5px dashed var(--border-strong)', background: 'var(--surface-2)',
