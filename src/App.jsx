@@ -7,14 +7,14 @@ import { Login } from './auth.jsx';
 import { Sidebar, Topbar } from './shell.jsx';
 import { GestorDashboard, Planejamentos } from './gestor.jsx';
 import { PlanDetail, HabilidadesBNCC } from './gestor2.jsx';
-import { NiveisConfig, ProfessoresTurmas, Periodos } from './gestor3.jsx';
-import { Orientacoes, OrientacaoDetail, OrientacoesProfessor } from './orientacoes.jsx';
+import { ProfessoresTurmas, Periodos } from './gestor3.jsx';
 import { ProfessorPainel, VerificacaoContinua } from './professor.jsx';
-import { NiveisLeitura, MeusAlunos, MeuPlanejamento } from './professor2.jsx';
+import { MeusAlunos, MeuPlanejamento } from './professor2.jsx';
 import { FichaAluno } from './aluno.jsx';
 import { AdminRedeDashboard, AdminEscolas } from './admin.jsx';
 import { AdminEscolaDetail, AdminTurmas, AdminTurmaDetail, AdminAlunos, AdminAlunoFicha, AdminUsers, AdminConfig } from './admin2.jsx';
 import { GruposEscolas } from './grupos.jsx';
+import { AnosEscolares } from './anos.jsx';
 
 const DEFAULT_ROUTE = { gestor: 'dashboard', professor: 'painel', admin: 'admrede', secretaria: 'admrede' };
 
@@ -44,7 +44,6 @@ const App = () => {
   const [periodo, setPeriodo] = useState('m01');
   const [planId, setPlanId] = useState(null);
   const [alunoId, setAlunoId] = useState(null);
-  const [orientacaoId, setOrientacaoId] = useState(null);
   // drill-down admin
   const [escolaId, setEscolaId] = useState(null);
   const [turmaId, setTurmaId] = useState(null);
@@ -53,7 +52,7 @@ const App = () => {
   // re-render quando o store hidrata/atualiza DATA
   useEffect(() => subscribe(force), []);
 
-  const clearDrill = () => { setPlanId(null); setAlunoId(null); setOrientacaoId(null); setEscolaId(null); setTurmaId(null); setAdmAlunoId(null); };
+  const clearDrill = () => { setPlanId(null); setAlunoId(null); setEscolaId(null); setTurmaId(null); setAdmAlunoId(null); };
   const enter = u => {
     setUser(u);
     setRoute(DEFAULT_ROUTE[u.perfil]);
@@ -87,7 +86,6 @@ const App = () => {
   // overlays (prioridade do mais profundo ao mais raso)
   if (alunoId) view = <FichaAluno alunoId={alunoId} back={() => setAlunoId(null)} />;
   else if (planId) view = <PlanDetail planId={planId} back={() => setPlanId(null)} />;
-  else if (orientacaoId) view = <OrientacaoDetail orientacaoId={orientacaoId} back={() => setOrientacaoId(null)} />;
   else if (admAlunoId) view = <AdminAlunoFicha alunoId={admAlunoId} back={() => setAdmAlunoId(null)} />;
   else if (turmaId) view = <AdminTurmaDetail turmaId={turmaId} back={() => setTurmaId(null)} openAluno={setAdmAlunoId} />;
   else if (escolaId) view = <AdminEscolaDetail escolaId={escolaId} back={() => setEscolaId(null)} openTurma={setTurmaId} />;
@@ -96,22 +94,19 @@ const App = () => {
       // gestor
       case 'dashboard': view = <GestorDashboard go={go} />; break;
       case 'planejamentos': view = <Planejamentos go={go} openPlan={setPlanId} />; break;
-      case 'orientacoes': view = <Orientacoes openOrientacao={setOrientacaoId} />; break;
       case 'habilidades': view = <HabilidadesBNCC />; break;
-      case 'niveis': view = <NiveisConfig />; break;
       case 'professores': view = <ProfessoresTurmas openAluno={setAlunoId} />; break;
       case 'periodos': view = <Periodos />; break;
       // professor
       case 'painel': view = <ProfessorPainel go={go} />; break;
       case 'verificacao': view = <VerificacaoContinua openAluno={setAlunoId} />; break;
-      case 'leitura': view = <NiveisLeitura openAluno={setAlunoId} />; break;
-      case 'orientacoesprof': view = <OrientacoesProfessor />; break;
       case 'alunos': view = <MeusAlunos openAluno={setAlunoId} />; break;
       case 'planoprof': view = <MeuPlanejamento />; break;
       // admin (rede)
       case 'admrede': view = <AdminRedeDashboard openEscola={openEscola} />; break;
       case 'admescolas': view = <AdminEscolas openEscola={setEscolaId} />; break;
       case 'admgrupos': view = <GruposEscolas />; break;
+      case 'admanos': view = <AnosEscolares />; break;
       case 'admturmas': view = <AdminTurmas openTurma={setTurmaId} />; break;
       case 'admalunos': view = <AdminAlunos openAluno={setAdmAlunoId} />; break;
       case 'admusers': view = <AdminUsers />; break;

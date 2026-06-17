@@ -219,17 +219,6 @@ export const PageHeader = ({ title, subtitle, actions }) => (
   </div>
 );
 
-/* ---------------- Nível de leitura pill ---------------- */
-export const NivelPill = ({ nivel, full }) => {
-  const nv = DATA.nivel(nivel);
-  if (!nv) return null;
-  return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: 'var(--text-2)' }}>
-      <span style={{ width: 9, height: 9, borderRadius: 3, background: nv.cor, flex: 'none' }} />
-      {full ? nv.nome : nv.curto}
-    </span>
-  );
-};
 
 /* ---------------- Resultado badge ---------------- */
 export const ResultadoBadge = ({ r }) => {

@@ -3,14 +3,13 @@
    ============================================================ */
 import React, { useState } from 'react';
 import { DATA } from './data.js';
-import { PageHeader, I, Stat, Bar, Donut, VBars, LineChart, MatrizBadge, Avatar } from './ui.jsx';
+import { PageHeader, I, Stat, Bar, VBars, MatrizBadge, Avatar } from './ui.jsx';
 import { NovoPlanejamento } from './gestor2.jsx';
+import { excluirPlanejamento } from './store.js';
 
 /* -------- Dashboard consolidado -------- */
 export const GestorDashboard = ({ go }) => {
   const D = DATA;
-  const dist = D.distribuicaoNiveis(D.alunosT1);
-  const totalAlunos = D.alunosT1.length;
 
   // % habilidades trabalhadas por professor
   const porProf = [
@@ -23,13 +22,12 @@ export const GestorDashboard = ({ go }) => {
     { label: 'LP01', value: 3 }, { label: 'LP02', value: 2 }, { label: 'LP04', value: 4 },
     { label: 'LP07', value: 1 }, { label: 'LP01b', value: 0, color: 'var(--border-strong)' },
   ];
-  const niveisSeg = D.NIVEIS.map((n, i) => ({ label: n.curto, value: dist[i], color: n.cor }));
 
   return (
     <div className="fade-in">
       <PageHeader
         title="Dashboard consolidado"
-        subtitle="Acompanhe o andamento de planejamentos, habilidades trabalhadas e evolução dos níveis de leitura das turmas sob sua responsabilidade."
+        subtitle="Acompanhe o andamento de planejamentos e habilidades trabalhadas."
         actions={<>
           <button className="btn btn-ghost"><I name="download" size={16} />Exportar relatório</button>
           <button className="btn btn-primary" onClick={() => go('planejamentos')}><I name="plus" size={16} />Novo planejamento</button>
@@ -43,49 +41,29 @@ export const GestorDashboard = ({ go }) => {
         <Stat label="Avaliações registradas" value="68" delta={9} sub="nos últimos 30 dias" icon="check" accent="#0e8aa8" />
       </div>
 
-      <div className="grid" style={{ gridTemplateColumns: '1.4fr 1fr', marginBottom: 18 }}>
-        {/* Habilidades trabalhadas por professor */}
-        <div className="card card-pad">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
-            <div>
-              <h3 style={{ fontSize: 15 }}>Habilidades trabalhadas por professor</h3>
-              <p style={{ fontSize: 12.5, color: 'var(--text-3)', marginTop: 2 }}>Percentual do planejamento já iniciado no período</p>
-            </div>
-            <button className="btn btn-subtle btn-sm" onClick={() => go('professores')}>Detalhes<I name="chevR" size={14} /></button>
+      {/* Habilidades trabalhadas por professor */}
+      <div className="card card-pad" style={{ marginBottom: 18 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
+          <div>
+            <h3 style={{ fontSize: 15 }}>Habilidades trabalhadas por professor</h3>
+            <p style={{ fontSize: 12.5, color: 'var(--text-3)', marginTop: 2 }}>Percentual do planejamento já iniciado no período</p>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-            {porProf.map((p, i) => (
-              <div key={i}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 7 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-                    <span style={{ width: 9, height: 9, borderRadius: 3, background: p.color }} />
-                    <span style={{ fontWeight: 600, fontSize: 13.5 }}>{p.label}</span>
-                    <span className="chip" style={{ fontSize: 11, padding: '1px 8px' }}>{p.sub}</span>
-                  </div>
-                  <span className="num" style={{ fontWeight: 800, fontSize: 15 }}>{p.display}</span>
-                </div>
-                <Bar value={p.value} color={p.color} height={9} />
-              </div>
-            ))}
-          </div>
+          <button className="btn btn-subtle btn-sm" onClick={() => go('professores')}>Detalhes<I name="chevR" size={14} /></button>
         </div>
-
-        {/* Distribuição de leitura */}
-        <div className="card card-pad">
-          <h3 style={{ fontSize: 15, marginBottom: 4 }}>Distribuição de leitura</h3>
-          <p style={{ fontSize: 12.5, color: 'var(--text-3)', marginBottom: 14 }}>1º Ano A · {totalAlunos} alunos</p>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
-            <Donut segments={niveisSeg} centerLabel={totalAlunos} centerSub="alunos" />
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: 1 }}>
-              {D.NIVEIS.map((n, i) => (
-                <div key={n.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5 }}>
-                  <span style={{ width: 9, height: 9, borderRadius: 3, background: n.cor, flex: 'none' }} />
-                  <span style={{ flex: 1, color: 'var(--text-2)' }}>{n.nome}</span>
-                  <span className="num" style={{ fontWeight: 700 }}>{dist[i]}</span>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+          {porProf.map((p, i) => (
+            <div key={i}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 7 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+                  <span style={{ width: 9, height: 9, borderRadius: 3, background: p.color }} />
+                  <span style={{ fontWeight: 600, fontSize: 13.5 }}>{p.label}</span>
+                  <span className="chip" style={{ fontSize: 11, padding: '1px 8px' }}>{p.sub}</span>
                 </div>
-              ))}
+                <span className="num" style={{ fontWeight: 800, fontSize: 15 }}>{p.display}</span>
+              </div>
+              <Bar value={p.value} color={p.color} height={9} />
             </div>
-          </div>
+          ))}
         </div>
       </div>
 
@@ -151,29 +129,6 @@ export const GestorDashboard = ({ go }) => {
           })}
         </div>
       </div>
-
-      {/* Evolução temporal dos níveis de leitura */}
-      <div className="card card-pad">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-          <div>
-            <h3 style={{ fontSize: 15 }}>Evolução dos níveis de leitura</h3>
-            <p style={{ fontSize: 12.5, color: 'var(--text-3)', marginTop: 2 }}>Nível médio da turma 1º Ano A ao longo do bimestre</p>
-          </div>
-          <div style={{ display: 'flex', gap: 16, fontSize: 12 }}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 16, height: 3, borderRadius: 2, background: '#2563eb' }} />1º Ano A</span>
-            <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 16, height: 3, borderRadius: 2, background: '#6d4bd1' }} />1º Ano B</span>
-          </div>
-        </div>
-        <LineChart
-          labels={['08/02', '24/02', '14/03', '02/04', '17/04']}
-          yMax={6}
-          yLabels={['', 'N.lê', 'Síl', 'Pal', 'Fra', 'T-sf', 'T-cf']}
-          series={[
-            { color: '#2563eb', data: [2.2, 2.6, 2.9, 3.1, 3.3] },
-            { color: '#6d4bd1', data: [1.9, 2.2, 2.5, 2.8, 3.0] },
-          ]}
-        />
-      </div>
     </div>
   );
 };
@@ -182,9 +137,14 @@ export const GestorDashboard = ({ go }) => {
 export const Planejamentos = ({ go, openPlan }) => {
   const D = DATA;
   const [novo, setNovo] = useState(false);
+  const [editar, setEditar] = useState(null);
   const podeCriar = ['admin', 'secretaria'].includes(D.CURRENT_USER?.perfil);
-  const anosTxt = pl => pl.anos && pl.anos.length ? pl.anos.map(a => a + 'º').join(', ') + ' ano' : 'Todas as séries';
+  const anosTxt = pl => pl.anos && pl.anos.length ? pl.anos.map(a => D.anoNome(a)).join(', ') : 'Todas as séries';
   const statusBadge = s => s === 'ativo' ? ['badge-green', 'Ativo'] : s === 'arquivado' ? ['badge-gray', 'Arquivado'] : ['badge-blue', 'Concluído'];
+  const excluir = async pl => {
+    if (!window.confirm(`Excluir o planejamento "${pl.titulo}"?\n\nAs habilidades vinculadas, as sequências didáticas semanais dos professores e os registros de verificação contínua deste planejamento serão removidos. Esta ação não pode ser desfeita.`)) return;
+    try { await excluirPlanejamento(pl.id); } catch (err) { alert(err.message); }
+  };
 
   return (
     <div className="fade-in">
@@ -215,7 +175,15 @@ export const Planejamentos = ({ go, openPlan }) => {
                 <div className="card-pad">
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12, gap: 10 }}>
                     <span className="chip"><I name="calendar" size={13} />{D.periodoNome(pl.periodo)}</span>
-                    <span className={'badge ' + scls}>{slbl}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span className={'badge ' + scls}>{slbl}</span>
+                      {podeCriar && (
+                        <div style={{ display: 'flex', gap: 2 }} onClick={e => e.stopPropagation()}>
+                          <button className="icon-btn" title="Editar planejamento" onClick={() => setEditar(pl)}><I name="edit" size={14} /></button>
+                          <button className="icon-btn" title="Excluir planejamento" onClick={() => excluir(pl)}><I name="x" size={14} /></button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                   <h3 style={{ fontSize: 15.5, marginBottom: 8, lineHeight: 1.3 }}>{pl.titulo}</h3>
                   {pl.objetivo && <p style={{ fontSize: 12.5, color: 'var(--text-2)', lineHeight: 1.5, marginBottom: 16,
@@ -254,6 +222,7 @@ export const Planejamentos = ({ go, openPlan }) => {
       )}
 
       {novo && <NovoPlanejamento onClose={() => setNovo(false)} />}
+      {editar && <NovoPlanejamento plano={editar} onClose={() => setEditar(null)} />}
     </div>
   );
 };

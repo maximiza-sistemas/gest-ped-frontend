@@ -14,7 +14,10 @@ export const setToken = t => localStorage.setItem(TOKEN_KEY, t);
 export const clearToken = () => localStorage.removeItem(TOKEN_KEY);
 
 async function request(path, { method = 'GET', body } = {}) {
-  const headers = { 'Content-Type': 'application/json' };
+  const hasBody = body !== undefined;
+  // só declara Content-Type quando há corpo: o Fastify rejeita (400) requisições
+  // sem corpo que mesmo assim mandam content-type: application/json (ex.: DELETE).
+  const headers = hasBody ? { 'Content-Type': 'application/json' } : {};
   const token = getToken();
   if (token) headers.Authorization = 'Bearer ' + token;
 
@@ -22,7 +25,7 @@ async function request(path, { method = 'GET', body } = {}) {
   try {
     res = await fetch(API_BASE + path, {
       method, headers,
-      body: body !== undefined ? JSON.stringify(body) : undefined,
+      body: hasBody ? JSON.stringify(body) : undefined,
     });
   } catch {
     throw new Error('Não foi possível conectar ao servidor. Verifique se a API está no ar.');

@@ -49,15 +49,12 @@ export async function hydrateForUser(user) {
     await hydrateRede();
     await hydrateGrupos();
   }
-  // orientações: secretaria/admin criam; gestor/professor visualizam
-  await hydrateOrientacoes();
   notify();
 }
 
 export async function hydrateMeta() {
   const m = await api.get('/meta');
   Object.assign(DATA, {
-    NIVEIS: m.NIVEIS,
     COMPONENTES: m.COMPONENTES,
     PERIODOS: m.PERIODOS,
     MATRIZES: m.MATRIZES,
@@ -65,6 +62,7 @@ export async function hydrateMeta() {
     habByCod: Object.fromEntries(m.HABILIDADES.map(h => [h.cod, h])),
     PROFESSORES: m.PROFESSORES,
     USUARIOS: m.USUARIOS,
+    ANOS: m.ANOS || DATA.ANOS,
     ESCOLAS: m.ESCOLAS || [],
     ESCOLA: m.ESCOLA,
     REDE: { ...DATA.REDE, ...m.REDE },
@@ -173,21 +171,6 @@ export async function registrarAvaliacaoLote(payload) {
   return avaliacoes; // a tela usa para atualizar a turma selecionada
 }
 
-/** Registro de nível de leitura: { data, registros: [{alunoId, nivel}] } */
-export async function registrarLeituraLote(payload) {
-  await api.post('/leitura/lote', payload);
-  // recarrega a turma avaliada (o professor pode estar em várias) p/ consistência
-  const turmaId = payload.turmaId || (DATA.TURMA_ATUAL && DATA.TURMA_ATUAL.id) || 't1';
-  const t = await api.get('/turmas/' + turmaId + '/full');
-  if (turmaId === ((DATA.TURMA_ATUAL && DATA.TURMA_ATUAL.id) || 't1')) {
-    DATA.ALUNOS = t.alunos;
-    DATA.alunosT1 = t.alunos;
-  }
-  DATA.TIMELINE = await api.get('/timeline?limit=30');
-  notify();
-  return t.alunos;
-}
-
 /** Atividades/recursos/status de uma habilidade do planejamento */
 export async function salvarTrabalho(planejamentoId, habCod, payload) {
   const t = await api.patch(`/planejamentos/${planejamentoId}/trabalho/${habCod}`, payload);
@@ -210,13 +193,23 @@ export async function criarPlanejamento(form) {
   return plano;
 }
 
-/** Editar/arquivar planejamento (secretaria): { titulo?, objetivo?, status?, periodo?, habilidades? } */
+/** Editar/arquivar planejamento (secretaria): { titulo?, objetivo?, status?, periodo?, anos?, grupo?, habilidades? } */
 export async function atualizarPlanejamento(id, payload) {
   const d = await api.patch('/planejamentos/' + id, payload);
   const i = DATA.PLANEJAMENTOS.findIndex(p => p.id === id);
   if (i >= 0) DATA.PLANEJAMENTOS[i] = { ...DATA.PLANEJAMENTOS[i], ...d };
-  notify();
+  // habilidades podem ter mudado → re-hidrata trabalho/semanas deste plano
+  await hydratePlano(id);
   return d;
+}
+
+/** Apagar planejamento (secretaria) — remove habilidades, trabalhos, semanas e avaliações vinculadas */
+export async function excluirPlanejamento(id) {
+  await api.delete('/planejamentos/' + id);
+  DATA.PLANEJAMENTOS = DATA.PLANEJAMENTOS.filter(p => p.id !== id);
+  delete DATA.TRABALHO[id];
+  delete DATA.SEMANAS[id];
+  notify();
 }
 
 /** Salva as sequências semanais do professor: [{ semana, sequenciaDidatica, recursosDidaticos, verificacaoAprendizagem, referencias }] */
@@ -229,44 +222,6 @@ export async function salvarSemanas(planejamentoId, semanas) {
   notify();
   return saved;
 }
-
-/* ---------------- orientações + trilhas ---------------- */
-
-export async function hydrateOrientacoes() {
-  DATA.ORIENTACOES = await api.get('/orientacoes');
-}
-
-/** Nova orientação (gestor) */
-export async function criarOrientacao(form) {
-  const o = await api.post('/orientacoes', {
-    titulo: form.titulo, objetivo: form.objetivo,
-    escopo: form.escopo, escolaIds: form.escolaIds, anos: form.anos,
-    comp: form.comp || null, modoGeral: form.modoGeral,
-    habilidades: form.modoGeral ? [] : form.habilidades,
-    periodo: form.periodo || null,
-  });
-  await hydrateOrientacoes();
-  notify();
-  return o;
-}
-
-/** Arquivar/editar orientação (gestor) */
-export async function atualizarOrientacao(id, payload) {
-  const o = await api.patch('/orientacoes/' + id, payload);
-  await hydrateOrientacoes();
-  notify();
-  return o;
-}
-
-/** Salva a trilha do professor para uma orientação: { etapas, observacao, status } */
-export async function salvarTrilha(orientacaoId, payload) {
-  const t = await api.post(`/orientacoes/${orientacaoId}/trilha`, payload);
-  await hydrateOrientacoes();
-  notify();
-  return t;
-}
-
-export const fetchOrientacao = id => api.get('/orientacoes/' + id);
 
 /* ---------------- grupos de escolas (admin/secretaria) ---------------- */
 
@@ -333,6 +288,42 @@ export async function adminSalvarConfig(payload) {
   await hydrateMeta(); // períodos (atual) podem ter mudado
   notify();
 }
+
+/* ---------------- anos escolares (séries) — admin/secretaria ---------------- */
+export const fetchAnos = () => api.get('/anos');
+export async function criarAno(payload) {
+  const a = await api.post('/anos', payload);
+  await hydrateMeta(); // atualiza DATA.ANOS p/ os seletores
+  notify();
+  return a;
+}
+export async function atualizarAno(ordem, payload) {
+  const a = await api.patch('/anos/' + ordem, payload);
+  await hydrateMeta();
+  notify();
+  return a;
+}
+export async function excluirAno(ordem) {
+  await api.delete('/anos/' + ordem);
+  await hydrateMeta();
+  notify();
+}
+
+/* ---------------- escolas / turmas / alunos — admin/secretaria ---------------- */
+// recarrega rede (escolas+turmas+alunos agregados) e meta (lista de escolas)
+async function refreshRede() {
+  await Promise.all([hydrateRede(), hydrateMeta()]);
+  notify();
+}
+export async function adminCriarEscola(payload) { const e = await api.post('/admin/escolas', payload); await refreshRede(); return e; }
+export async function adminEditarEscola(id, payload) { const e = await api.patch('/admin/escolas/' + id, payload); await refreshRede(); return e; }
+export async function adminExcluirEscola(id) { await api.delete('/admin/escolas/' + id); await refreshRede(); }
+export async function adminCriarTurma(payload) { const t = await api.post('/admin/turmas', payload); await refreshRede(); return t; }
+export async function adminEditarTurma(id, payload) { const t = await api.patch('/admin/turmas/' + id, payload); await refreshRede(); return t; }
+export async function adminExcluirTurma(id) { await api.delete('/admin/turmas/' + id); await refreshRede(); }
+export async function adminCriarAluno(payload) { const a = await api.post('/admin/alunos', payload); await refreshRede(); return a; }
+export async function adminEditarAluno(id, payload) { const a = await api.patch('/admin/alunos/' + id, payload); await refreshRede(); return a; }
+export async function adminExcluirAluno(id) { await api.delete('/admin/alunos/' + id); await refreshRede(); }
 
 /* fetch lazy usados nas fichas/drill-down */
 export const fetchAlunoFull = id => api.get('/alunos/' + id + '/full');

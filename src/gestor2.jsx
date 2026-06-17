@@ -3,18 +3,23 @@
    habilidades, níveis, professores, períodos
    ============================================================ */
 import React, { useState } from 'react';
-import { DATA, criarPlanejamento } from './store.js';
+import { DATA, criarPlanejamento, atualizarPlanejamento, excluirPlanejamento } from './store.js';
 import { Modal, I, MatrizBadge, Avatar, PageHeader } from './ui.jsx';
 
-/* -------- Wizard: novo planejamento -------- */
-export const NovoPlanejamento = ({ onClose }) => {
+/* -------- Wizard: novo / editar planejamento -------- */
+export const NovoPlanejamento = ({ onClose, plano }) => {
   const D = DATA;
+  const editando = !!plano;
   const [step, setStep] = useState(1);
-  const [form, setForm] = useState(() => ({
+  const [form, setForm] = useState(() => editando ? {
+    titulo: plano.titulo || '', objetivo: plano.objetivo || '',
+    periodo: plano.periodo || (DATA.PERIODOS.find(p => p.atual) || DATA.PERIODOS[0] || {}).id || 'm01',
+    anos: plano.anos || [], grupo: plano.grupo || '', habs: plano.habilidades || [],
+  } : {
     titulo: '', objetivo: '',
     periodo: (DATA.PERIODOS.find(p => p.atual) || DATA.PERIODOS[0] || {}).id || 'm01',
     anos: [], grupo: '', habs: [],
-  }));
+  });
   const [matFilter, setMatFilter] = useState('todas');
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState(null);
@@ -31,7 +36,11 @@ export const NovoPlanejamento = ({ onClose }) => {
     setSalvando(true);
     setErro(null);
     try {
-      await criarPlanejamento(form);
+      if (editando) await atualizarPlanejamento(plano.id, {
+        titulo: form.titulo, objetivo: form.objetivo, periodo: form.periodo,
+        anos: form.anos || [], grupo: form.grupo || null, habilidades: form.habs,
+      });
+      else await criarPlanejamento(form);
       onClose();
     } catch (err) {
       setErro(err.message);
@@ -47,12 +56,12 @@ export const NovoPlanejamento = ({ onClose }) => {
       <button className="btn btn-ghost" onClick={onClose}>Cancelar</button>
       {step < 2
         ? <button className="btn btn-primary" disabled={!podeAvancar} style={{ opacity: podeAvancar ? 1 : .5 }} onClick={() => setStep(step + 1)}>Continuar<I name="chevR" size={15} /></button>
-        : <button className="btn btn-primary" disabled={salvando || !podeAvancar} style={{ opacity: salvando || !podeAvancar ? .6 : 1 }} onClick={cadastrar}><I name="check2" size={15} />{salvando ? 'Cadastrando…' : 'Cadastrar planejamento'}</button>}
+        : <button className="btn btn-primary" disabled={salvando || !podeAvancar} style={{ opacity: salvando || !podeAvancar ? .6 : 1 }} onClick={cadastrar}><I name="check2" size={15} />{salvando ? 'Salvando…' : (editando ? 'Salvar alterações' : 'Cadastrar planejamento')}</button>}
     </>
   );
 
   return (
-    <Modal title="Novo planejamento mensal" subtitle={`Etapa ${step} de 2 · ${steps[step - 1]}`} icon="plan" width={640} onClose={onClose} footer={foot}>
+    <Modal title={editando ? 'Editar planejamento' : 'Novo planejamento mensal'} subtitle={`Etapa ${step} de 2 · ${steps[step - 1]}`} icon="plan" width={640} onClose={onClose} footer={foot}>
       {/* stepper */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 22 }}>
         {steps.map((s, i) => (
@@ -88,13 +97,13 @@ export const NovoPlanejamento = ({ onClose }) => {
             <label className="field-label">Ano(s) escolar(es) <span style={{ color: 'var(--text-4)', fontWeight: 400 }}>(vazio = todas as séries)</span></label>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {D.ANOS.map(a => {
-                const on = form.anos.includes(a);
+                const on = form.anos.includes(a.ordem);
                 return (
-                  <button key={a} type="button" onClick={() => toggleAno(a)}
+                  <button key={a.ordem} type="button" onClick={() => toggleAno(a.ordem)}
                     style={{ padding: '8px 14px', borderRadius: 9, fontSize: 13, fontWeight: 700,
                       border: '1.5px solid ' + (on ? 'var(--primary)' : 'var(--border-strong)'),
                       background: on ? 'var(--primary)' : 'transparent', color: on ? '#fff' : 'var(--text-2)' }}>
-                    {a}º ano
+                    {a.nome}
                   </button>
                 );
               })}
@@ -195,12 +204,21 @@ export const SemanaCard = ({ s }) => {
 /* -------- Detalhe do planejamento -------- */
 export const PlanDetail = ({ planId, back }) => {
   const D = DATA;
+  const [editando, setEditando] = useState(false);
+  const [excluindo, setExcluindo] = useState(false);
   const pl = D.PLANEJAMENTOS.find(p => p.id === planId);
   if (!pl) return <div className="card card-pad" style={{ color: 'var(--text-3)' }}>Planejamento não encontrado.</div>;
+  const podeEditar = ['admin', 'secretaria'].includes(D.CURRENT_USER?.perfil);
+  const excluir = async () => {
+    if (!window.confirm(`Excluir o planejamento "${pl.titulo}"?\n\nAs habilidades vinculadas, as sequências didáticas semanais dos professores e os registros de verificação contínua deste planejamento serão removidos. Esta ação não pode ser desfeita.`)) return;
+    setExcluindo(true);
+    try { await excluirPlanejamento(pl.id); back(); }
+    catch (err) { alert(err.message); setExcluindo(false); }
+  };
   const trab = D.TRABALHO[pl.id] || {};
   const semanas = D.SEMANAS[pl.id] || [];
   const stMap = { trabalhada: ['badge-green', 'Trabalhada'], andamento: ['badge-amber', 'Em andamento'], pendente: ['badge-gray', 'Pendente'] };
-  const anosTxt = pl.anos && pl.anos.length ? pl.anos.map(a => a + 'º').join(', ') + ' ano' : 'Todas as séries';
+  const anosTxt = pl.anos && pl.anos.length ? pl.anos.map(a => D.anoNome(a)).join(', ') : 'Todas as séries';
   const grupoTxt = pl.grupoNome || 'Toda a rede';
   const statusTxt = { ativo: 'Ativo', 'concluído': 'Concluído', arquivado: 'Arquivado' }[pl.status] || pl.status;
   const porProf = {};
@@ -211,6 +229,12 @@ export const PlanDetail = ({ planId, back }) => {
       <PageHeader
         title={pl.titulo}
         subtitle={pl.objetivo}
+        actions={podeEditar && (
+          <>
+            <button className="btn btn-subtle" onClick={() => setEditando(true)}><I name="edit" size={15} />Editar</button>
+            <button className="btn btn-subtle" onClick={excluir} disabled={excluindo} style={{ color: 'var(--red)' }}><I name="x" size={15} />{excluindo ? 'Excluindo…' : 'Excluir'}</button>
+          </>
+        )}
       />
       <div className="grid" style={{ gridTemplateColumns: '1fr 300px' }}>
         <div className="card">
@@ -295,6 +319,8 @@ export const PlanDetail = ({ planId, back }) => {
           </div>
         ))}
       </div>
+
+      {editando && <NovoPlanejamento plano={pl} onClose={() => setEditando(false)} />}
     </div>
   );
 };

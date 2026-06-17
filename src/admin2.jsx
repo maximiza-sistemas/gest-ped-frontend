@@ -3,9 +3,10 @@
    Ficha de leitura, Usuários, Configurações
    ============================================================ */
 import React, { useState, useEffect } from 'react';
-import { DATA, fetchTurmaFull, fetchAlunoFull, fetchAvaliacoesAluno, adminCriarUsuario, adminEditarUsuario, adminExcluirUsuario, adminConfig, adminSalvarConfig } from './store.js';
-import { PageHeader, Stat, I, Avatar, NivelPill, LineChart, Modal } from './ui.jsx';
-import { DistBar, ZonaBadge, NiveisLegend, fmt } from './admin.jsx';
+import { DATA, fetchTurmaFull, fetchAlunoFull, fetchAvaliacoesAluno, adminCriarUsuario, adminEditarUsuario, adminExcluirUsuario, adminConfig, adminSalvarConfig,
+  adminCriarTurma, adminEditarTurma, adminExcluirTurma, adminCriarAluno, adminEditarAluno, adminExcluirAluno, adminEditarEscola } from './store.js';
+import { PageHeader, Stat, I, Avatar, Modal } from './ui.jsx';
+import { ZonaBadge, fmt, EscolaForm } from './admin.jsx';
 
 const Carregando = ({ back }) => (
   <div className="fade-in">
@@ -17,8 +18,10 @@ const Carregando = ({ back }) => (
 /* -------- Detalhe da escola -------- */
 export const AdminEscolaDetail = ({ escolaId, back, openTurma }) => {
   const D = DATA;
+  const [editando, setEditando] = useState(false);
   const e = D.escola(escolaId);
-  const totalDist = e.dist.reduce((a, b) => a + b, 0);
+  if (!e) return <Carregando back={back} />;
+  const salvarEscola = f => adminEditarEscola(e.id, { nome: f.nome.trim(), sigla: f.sigla.trim(), zona: f.zona, bairro: f.bairro, diretor: f.diretor, cor: f.cor });
   return (
     <div className="fade-in">
       <button className="btn btn-subtle btn-sm" style={{ marginBottom: 16 }} onClick={back}><I name="chevL" size={15} />Voltar às escolas</button>
@@ -30,54 +33,93 @@ export const AdminEscolaDetail = ({ escolaId, back, openTurma }) => {
             <ZonaBadge zona={e.zona} />
             <span className="chip"><I name="pin" size={13} />{e.bairro}</span>
             <span className="chip"><I name="user" size={13} />Dir. {e.diretor}</span>
-            <span className="chip">Anos: {e.anos.map(a => a + 'º').join(', ')}</span>
+            <span className="chip">Anos: {e.anos.map(a => D.anoNome(a)).join(', ')}</span>
           </div>
         </div>
-        <button className="btn btn-ghost"><I name="edit" size={15} />Editar escola</button>
+        <button className="btn btn-ghost" onClick={() => setEditando(true)}><I name="edit" size={15} />Editar escola</button>
       </div>
 
-      <div className="grid" style={{ gridTemplateColumns: 'repeat(4,1fr)', marginBottom: 18 }}>
+      <div className="grid" style={{ gridTemplateColumns: 'repeat(3,1fr)', marginBottom: 18 }}>
         <Stat label="Turmas" value={e.totTurmas} icon="grid" accent={e.cor} />
         <Stat label="Alunos" value={e.totAlunos} icon="users" accent="#6d4bd1" />
         <Stat label="Professores" value={e.professores} icon="grad" accent="#0e8aa8" />
-        <Stat label="Alfabetização 1º–3º" value={e.alfInicial + '%'} icon="book" accent={e.alfInicial >= 70 ? '#15935f' : '#c77a07'} />
-      </div>
-
-      <div className="card card-pad" style={{ marginBottom: 18 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-          <h3 style={{ fontSize: 15 }}>Distribuição de níveis de leitura</h3>
-          <span style={{ fontSize: 12.5, color: 'var(--text-3)' }}>{e.totAlunos} alunos</span>
-        </div>
-        <div style={{ display: 'flex', height: 28, borderRadius: 9, overflow: 'hidden', marginBottom: 14 }}>
-          {D.NIVEIS.map((n, i) => e.dist[i] > 0 && (
-            <div key={n.id} title={n.nome} style={{ width: (e.dist[i] / totalDist * 100) + '%', background: n.cor, display: 'grid', placeItems: 'center', color: '#fff', fontSize: 11, fontWeight: 700 }}>{e.dist[i]}</div>
-          ))}
-        </div>
-        <NiveisLegend />
       </div>
 
       <h3 style={{ fontSize: 15, marginBottom: 12 }}>Turmas · {e.totTurmas}</h3>
       <div className="card">
         <table className="tbl">
-          <thead><tr><th>Turma</th><th>Ano</th><th>Turno</th><th style={{ textAlign: 'center' }}>Alunos</th><th style={{ width: 200 }}>Leitura</th><th></th></tr></thead>
+          <thead><tr><th>Turma</th><th>Ano</th><th>Turno</th><th style={{ textAlign: 'center' }}>Alunos</th><th></th></tr></thead>
           <tbody>
-            {e.turmas.map(t => {
-              const d = [0, 0, 0, 0, 0, 0]; t.alunos.forEach(a => d[a.nivelLeitura - 1]++);
-              return (
-                <tr key={t.id} className="clickable" onClick={() => openTurma(t.id)}>
-                  <td style={{ fontWeight: 600 }}>{t.nome}</td>
-                  <td style={{ color: 'var(--text-2)' }}>{t.ano}º ano</td>
-                  <td style={{ color: 'var(--text-2)' }}>{t.turno}</td>
-                  <td className="num" style={{ textAlign: 'center', fontWeight: 600 }}>{t.alunos.length}</td>
-                  <td><DistBar dist={d} /></td>
-                  <td style={{ textAlign: 'right' }}><I name="chevR" size={16} style={{ color: 'var(--text-4)' }} /></td>
-                </tr>
-              );
-            })}
+            {e.turmas.map(t => (
+              <tr key={t.id} className="clickable" onClick={() => openTurma(t.id)}>
+                <td style={{ fontWeight: 600 }}>{t.nome}</td>
+                <td style={{ color: 'var(--text-2)' }}>{D.anoNome(t.ano)}</td>
+                <td style={{ color: 'var(--text-2)' }}>{t.turno}</td>
+                <td className="num" style={{ textAlign: 'center', fontWeight: 600 }}>{t.alunos.length}</td>
+                <td style={{ textAlign: 'right' }}><I name="chevR" size={16} style={{ color: 'var(--text-4)' }} /></td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>
+
+      {editando && <EscolaForm titulo={'Editar — ' + e.nome} onClose={() => setEditando(false)} onSave={salvarEscola}
+        inicial={{ nome: e.nome, sigla: e.sigla, zona: e.zona, bairro: e.bairro || '', diretor: e.diretor || '', cor: e.cor }} />}
     </div>
+  );
+};
+
+/* -------- Formulário de turma (criar/editar) -------- */
+const TurmaForm = ({ titulo, inicial, onSave, onClose }) => {
+  const D = DATA;
+  const [f, setF] = useState(inicial);
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState(null);
+  const set = (k, v) => setF(x => ({ ...x, [k]: v }));
+  const salvar = async () => {
+    if (!f.escola) { setErro('Selecione a escola.'); return; }
+    if (!f.nome || f.nome.trim().length < 2) { setErro('Informe o nome da turma.'); return; }
+    setSalvando(true); setErro(null);
+    try { await onSave(f); onClose(); } catch (err) { setErro(err.message); setSalvando(false); }
+  };
+  const foot = (
+    <>
+      {erro && <span style={{ color: 'var(--red)', fontWeight: 600, fontSize: 12.5 }}>{erro}</span>}
+      <div style={{ flex: 1 }} />
+      <button className="btn btn-ghost" onClick={onClose}>Cancelar</button>
+      <button className="btn btn-primary" disabled={salvando} onClick={salvar} style={{ opacity: salvando ? .6 : 1 }}><I name="check2" size={15} />{salvando ? 'Salvando…' : 'Salvar'}</button>
+    </>
+  );
+  return (
+    <Modal title={titulo} icon="grid" width={460} onClose={onClose} footer={foot}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div>
+          <label className="field-label">Escola</label>
+          <select className="input" value={f.escola} onChange={e => set('escola', e.target.value)}>
+            <option value="">Selecione…</option>
+            {(D.ESCOLAS || []).map(e => <option key={e.id} value={e.id}>{e.nome}</option>)}
+          </select>
+        </div>
+        <div className="grid" style={{ gridTemplateColumns: '1.4fr 1fr', gap: 14 }}>
+          <div>
+            <label className="field-label">Nome da turma</label>
+            <input className="input" value={f.nome} onChange={e => set('nome', e.target.value)} placeholder="Ex.: 1º Ano A" />
+          </div>
+          <div>
+            <label className="field-label">Ano escolar</label>
+            <select className="input" value={f.ano} onChange={e => set('ano', +e.target.value)}>
+              {D.ANOS.map(a => <option key={a.ordem} value={a.ordem}>{a.nome}</option>)}
+            </select>
+          </div>
+        </div>
+        <div>
+          <label className="field-label">Turno</label>
+          <select className="input" value={f.turno} onChange={e => set('turno', e.target.value)}>
+            {['Matutino', 'Vespertino', 'Integral'].map(t => <option key={t} value={t}>{t}</option>)}
+          </select>
+        </div>
+      </div>
+    </Modal>
   );
 };
 
@@ -87,49 +129,65 @@ export const AdminTurmas = ({ openTurma }) => {
   const escolas = D.escolasFull();
   const [escFilter, setEscFilter] = useState('todas');
   const [anoFilter, setAnoFilter] = useState('todos');
+  const [novo, setNovo] = useState(false);
+  const [editar, setEditar] = useState(null);
   let turmas = [];
-  escolas.forEach(e => { if (escFilter === 'todas' || escFilter === e.id) e.turmas.forEach(t => turmas.push({ ...t, escolaNome: e.nome, escolaCor: e.cor, sigla: e.sigla })); });
+  escolas.forEach(e => { if (escFilter === 'todas' || escFilter === e.id) e.turmas.forEach(t => turmas.push({ ...t, escolaId: e.id, escolaNome: e.nome, escolaCor: e.cor, sigla: e.sigla })); });
   if (anoFilter !== 'todos') turmas = turmas.filter(t => t.ano === +anoFilter);
+
+  const criar = f => adminCriarTurma({ escola: f.escola, ano: f.ano, nome: f.nome.trim(), turno: f.turno });
+  const salvarEdicao = f => adminEditarTurma(editar.id, { escola: f.escola, ano: f.ano, nome: f.nome.trim(), turno: f.turno });
+  const excluir = async t => {
+    if (t.alunos.length > 0) return alert(`A turma "${t.nome}" tem ${t.alunos.length} aluno(s). Transfira-os antes de excluir.`);
+    if (!window.confirm(`Excluir a turma "${t.nome}"?`)) return;
+    try { await adminExcluirTurma(t.id); } catch (err) { alert(err.message); }
+  };
+
   return (
     <div className="fade-in">
-      <PageHeader title="Turmas" subtitle="Todas as turmas da rede. Filtre por escola ou ano para localizar rapidamente." />
+      <PageHeader title="Turmas" subtitle="Todas as turmas da rede. Filtre por escola ou ano para localizar rapidamente."
+        actions={<button className="btn btn-primary" onClick={() => setNovo(true)}><I name="plus" size={15} />Nova turma</button>} />
       <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
         <select className="input" style={{ maxWidth: 280 }} value={escFilter} onChange={e => setEscFilter(e.target.value)}>
           <option value="todas">Todas as escolas</option>
           {escolas.map(e => <option key={e.id} value={e.id}>{e.nome}</option>)}
         </select>
-        <select className="input" style={{ maxWidth: 160 }} value={anoFilter} onChange={e => setAnoFilter(e.target.value)}>
+        <select className="input" style={{ maxWidth: 180 }} value={anoFilter} onChange={e => setAnoFilter(e.target.value)}>
           <option value="todos">Todos os anos</option>
-          {[1, 2, 3, 4, 5].map(a => <option key={a} value={a}>{a}º ano</option>)}
+          {D.ANOS.map(a => <option key={a.ordem} value={a.ordem}>{a.nome}</option>)}
         </select>
         <div style={{ flex: 1 }} />
         <span style={{ alignSelf: 'center', fontSize: 12.5, color: 'var(--text-3)' }}>{turmas.length} turmas</span>
       </div>
       <div className="card">
         <table className="tbl">
-          <thead><tr><th>Turma</th><th>Escola</th><th>Turno</th><th style={{ textAlign: 'center' }}>Alunos</th><th style={{ width: 180 }}>Leitura</th><th></th></tr></thead>
+          <thead><tr><th>Turma</th><th>Escola</th><th>Ano</th><th>Turno</th><th style={{ textAlign: 'center' }}>Alunos</th><th style={{ width: 90 }}></th></tr></thead>
           <tbody>
-            {turmas.map(t => {
-              const d = [0, 0, 0, 0, 0, 0]; t.alunos.forEach(a => d[a.nivelLeitura - 1]++);
-              return (
-                <tr key={t.id} className="clickable" onClick={() => openTurma(t.id)}>
-                  <td style={{ fontWeight: 600 }}>{t.nome}</td>
-                  <td>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-                      <div style={{ width: 26, height: 26, borderRadius: 7, background: t.escolaCor + '18', color: t.escolaCor, display: 'grid', placeItems: 'center', fontWeight: 700, fontSize: 9.5, flex: 'none' }}>{t.sigla}</div>
-                      <span style={{ color: 'var(--text-2)', fontSize: 13 }}>{t.escolaNome}</span>
-                    </div>
-                  </td>
-                  <td style={{ color: 'var(--text-2)' }}>{t.turno}</td>
-                  <td className="num" style={{ textAlign: 'center', fontWeight: 600 }}>{t.alunos.length}</td>
-                  <td><DistBar dist={d} /></td>
-                  <td style={{ textAlign: 'right' }}><I name="chevR" size={16} style={{ color: 'var(--text-4)' }} /></td>
-                </tr>
-              );
-            })}
+            {turmas.map(t => (
+              <tr key={t.id} className="clickable" onClick={() => openTurma(t.id)}>
+                <td style={{ fontWeight: 600 }}>{t.nome}</td>
+                <td>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+                    <div style={{ width: 26, height: 26, borderRadius: 7, background: t.escolaCor + '18', color: t.escolaCor, display: 'grid', placeItems: 'center', fontWeight: 700, fontSize: 9.5, flex: 'none' }}>{t.sigla}</div>
+                    <span style={{ color: 'var(--text-2)', fontSize: 13 }}>{t.escolaNome}</span>
+                  </div>
+                </td>
+                <td style={{ color: 'var(--text-2)' }}>{D.anoNome(t.ano)}</td>
+                <td style={{ color: 'var(--text-2)' }}>{t.turno}</td>
+                <td className="num" style={{ textAlign: 'center', fontWeight: 600 }}>{t.alunos.length}</td>
+                <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }} onClick={e => e.stopPropagation()}>
+                  <button className="icon-btn" title="Editar turma" onClick={() => setEditar(t)}><I name="edit" size={15} /></button>
+                  <button className="icon-btn" title="Excluir turma" onClick={() => excluir(t)}><I name="x" size={15} /></button>
+                </td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>
+      {novo && <TurmaForm titulo="Nova turma" onClose={() => setNovo(false)} onSave={criar}
+        inicial={{ escola: '', nome: '', ano: (D.ANOS[0] || { ordem: 1 }).ordem, turno: 'Matutino' }} />}
+      {editar && <TurmaForm titulo={'Editar — ' + editar.nome} onClose={() => setEditar(null)} onSave={salvarEdicao}
+        inicial={{ escola: editar.escolaId, nome: editar.nome, ano: editar.ano, turno: editar.turno }} />}
     </div>
   );
 };
@@ -144,7 +202,6 @@ export const AdminTurmaDetail = ({ turmaId, back, openAluno }) => {
   }, [turmaId]);
   if (t === null) return <Carregando back={back} />;
   if (t === false) return <Carregando back={back} />;
-  const d = t.dist;
   return (
     <div className="fade-in">
       <button className="btn btn-subtle btn-sm" style={{ marginBottom: 16 }} onClick={back}><I name="chevL" size={15} />Voltar</button>
@@ -158,32 +215,67 @@ export const AdminTurmaDetail = ({ turmaId, back, openAluno }) => {
             <span className="chip"><I name="users" size={13} />{t.alunos.length} alunos</span>
           </div>
         </div>
-        <div style={{ width: 220 }}>
-          <div style={{ fontSize: 11.5, color: 'var(--text-3)', marginBottom: 6 }}>Distribuição de leitura</div>
-          <DistBar dist={d} height={10} />
-        </div>
       </div>
       <div className="card">
         <table className="tbl">
-          <thead><tr><th style={{ width: 40 }}>Nº</th><th>Aluno</th><th>Nível de leitura</th><th>Evolução</th><th></th></tr></thead>
+          <thead><tr><th style={{ width: 40 }}>Nº</th><th>Aluno</th><th></th></tr></thead>
           <tbody>
-            {t.alunos.map(a => {
-              const hist = a.histNivel || [];
-              const delta = hist.length ? a.nivelLeitura - hist[0].nivel : 0;
-              return (
-                <tr key={a.id} className="clickable" onClick={() => openAluno(a.id)}>
-                  <td className="num" style={{ color: 'var(--text-3)' }}>{String(a.numero).padStart(2, '0')}</td>
-                  <td><div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><Avatar nome={a.nome} iniciais={a.iniciais} cor="#64748b" size={30} /><span style={{ fontWeight: 600 }}>{a.nome}</span></div></td>
-                  <td><NivelPill nivel={a.nivelLeitura} full /></td>
-                  <td>{delta > 0 ? <span className="badge badge-green"><I name="arrowUp" size={11} sw={2.6} />+{delta}</span> : <span className="badge badge-gray">Estável</span>}</td>
-                  <td style={{ textAlign: 'right' }}><I name="chevR" size={16} style={{ color: 'var(--text-4)' }} /></td>
-                </tr>
-              );
-            })}
+            {t.alunos.map(a => (
+              <tr key={a.id} className="clickable" onClick={() => openAluno(a.id)}>
+                <td className="num" style={{ color: 'var(--text-3)' }}>{String(a.numero).padStart(2, '0')}</td>
+                <td><div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><Avatar nome={a.nome} iniciais={a.iniciais} cor="#64748b" size={30} /><span style={{ fontWeight: 600 }}>{a.nome}</span></div></td>
+                <td style={{ textAlign: 'right' }}><I name="chevR" size={16} style={{ color: 'var(--text-4)' }} /></td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>
     </div>
+  );
+};
+
+/* -------- Formulário de aluno (criar/editar) -------- */
+const AlunoForm = ({ titulo, inicial, turmas, editando, onSave, onClose }) => {
+  const [f, setF] = useState(inicial);
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState(null);
+  const set = (k, v) => setF(x => ({ ...x, [k]: v }));
+  const salvar = async () => {
+    if (!f.nome || f.nome.trim().length < 3) { setErro('Informe o nome completo do aluno.'); return; }
+    if (!f.turma) { setErro('Selecione a turma.'); return; }
+    setSalvando(true); setErro(null);
+    try { await onSave(f); onClose(); } catch (err) { setErro(err.message); setSalvando(false); }
+  };
+  const foot = (
+    <>
+      {erro && <span style={{ color: 'var(--red)', fontWeight: 600, fontSize: 12.5 }}>{erro}</span>}
+      <div style={{ flex: 1 }} />
+      <button className="btn btn-ghost" onClick={onClose}>Cancelar</button>
+      <button className="btn btn-primary" disabled={salvando} onClick={salvar} style={{ opacity: salvando ? .6 : 1 }}><I name="check2" size={15} />{salvando ? 'Salvando…' : 'Salvar'}</button>
+    </>
+  );
+  return (
+    <Modal title={titulo} icon="user" width={460} onClose={onClose} footer={foot}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div>
+          <label className="field-label">Nome completo</label>
+          <input className="input" value={f.nome} onChange={e => set('nome', e.target.value)} placeholder="Ex.: João da Silva" />
+        </div>
+        <div>
+          <label className="field-label">Turma</label>
+          <select className="input" value={f.turma} onChange={e => set('turma', e.target.value)}>
+            <option value="">Selecione…</option>
+            {turmas.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
+          </select>
+        </div>
+        {editando && (
+          <div style={{ maxWidth: 150 }}>
+            <label className="field-label">Número de chamada</label>
+            <input className="input" type="number" min={1} value={f.numero} onChange={e => set('numero', +e.target.value)} />
+          </div>
+        )}
+      </div>
+    </Modal>
   );
 };
 
@@ -193,16 +285,26 @@ export const AdminAlunos = ({ openAluno }) => {
   const escolas = D.escolasFull();
   const [q, setQ] = useState('');
   const [escFilter, setEscFilter] = useState('todas');
-  const [nivelFilter, setNivelFilter] = useState('todos');
+  const [novo, setNovo] = useState(false);
+  const [editar, setEditar] = useState(null);
+  const turmasOpts = escolas.flatMap(e => e.turmas.map(t => ({ id: t.id, label: e.sigla + ' · ' + t.nome })));
   let alunos = [];
-  escolas.forEach(e => { if (escFilter === 'todas' || escFilter === e.id) e.turmas.forEach(t => t.alunos.forEach(a => alunos.push({ ...a, escolaNome: e.nome, escolaCor: e.cor, sigla: e.sigla, turmaNome: t.nome }))); });
+  escolas.forEach(e => { if (escFilter === 'todas' || escFilter === e.id) e.turmas.forEach(t => t.alunos.forEach(a => alunos.push({ ...a, escolaNome: e.nome, escolaCor: e.cor, sigla: e.sigla, turmaId: t.id, turmaNome: t.nome }))); });
   if (q) alunos = alunos.filter(a => a.nome.toLowerCase().includes(q.toLowerCase()));
-  if (nivelFilter !== 'todos') alunos = alunos.filter(a => a.nivelLeitura === +nivelFilter);
   const total = alunos.length;
   const shown = alunos.slice(0, 50);
+
+  const criar = f => adminCriarAluno({ nome: f.nome.trim(), turma: f.turma });
+  const salvarEdicao = f => adminEditarAluno(editar.id, { nome: f.nome.trim(), turma: f.turma, numero: f.numero });
+  const excluir = async a => {
+    if (!window.confirm(`Excluir o aluno "${a.nome}"? Os registros de avaliação e leitura dele serão removidos.`)) return;
+    try { await adminExcluirAluno(a.id); } catch (err) { alert(err.message); }
+  };
+
   return (
     <div className="fade-in">
-      <PageHeader title="Alunos" subtitle="Diretório de estudantes de toda a rede. Busque por nome ou filtre por escola e nível de leitura." />
+      <PageHeader title="Alunos" subtitle="Diretório de estudantes de toda a rede. Busque por nome ou filtre por escola."
+        actions={<button className="btn btn-primary" onClick={() => setNovo(true)}><I name="plus" size={15} />Novo aluno</button>} />
       <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
         <div style={{ position: 'relative', flex: 1, minWidth: 240 }}>
           <I name="search" size={16} style={{ position: 'absolute', left: 12, top: 11, color: 'var(--text-3)' }} />
@@ -212,17 +314,13 @@ export const AdminAlunos = ({ openAluno }) => {
           <option value="todas">Todas as escolas</option>
           {escolas.map(e => <option key={e.id} value={e.id}>{e.nome}</option>)}
         </select>
-        <select className="input" style={{ maxWidth: 200 }} value={nivelFilter} onChange={e => setNivelFilter(e.target.value)}>
-          <option value="todos">Todos os níveis</option>
-          {D.NIVEIS.map(n => <option key={n.id} value={n.id}>{n.nome}</option>)}
-        </select>
       </div>
       <div className="card">
         <div style={{ padding: '10px 16px', borderBottom: '1px solid var(--border)', fontSize: 12.5, color: 'var(--text-3)' }}>
           {fmt(total)} alunos encontrados {total > 50 && <>· exibindo os primeiros 50</>}
         </div>
         <table className="tbl">
-          <thead><tr><th>Aluno</th><th>Escola</th><th>Turma</th><th>Nível de leitura</th><th></th></tr></thead>
+          <thead><tr><th>Aluno</th><th>Escola</th><th>Turma</th><th style={{ width: 90 }}></th></tr></thead>
           <tbody>
             {shown.map(a => (
               <tr key={a.id} className="clickable" onClick={() => openAluno(a.id)}>
@@ -234,20 +332,25 @@ export const AdminAlunos = ({ openAluno }) => {
                   </div>
                 </td>
                 <td style={{ color: 'var(--text-2)' }}>{a.turmaNome}</td>
-                <td><NivelPill nivel={a.nivelLeitura} full /></td>
-                <td style={{ textAlign: 'right' }}><I name="chevR" size={16} style={{ color: 'var(--text-4)' }} /></td>
+                <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }} onClick={e => e.stopPropagation()}>
+                  <button className="icon-btn" title="Editar aluno" onClick={() => setEditar(a)}><I name="edit" size={15} /></button>
+                  <button className="icon-btn" title="Excluir aluno" onClick={() => excluir(a)}><I name="x" size={15} /></button>
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+      {novo && <AlunoForm titulo="Novo aluno" turmas={turmasOpts} onClose={() => setNovo(false)} onSave={criar}
+        inicial={{ nome: '', turma: '' }} />}
+      {editar && <AlunoForm titulo={'Editar — ' + editar.nome} editando turmas={turmasOpts} onClose={() => setEditar(null)} onSave={salvarEdicao}
+        inicial={{ nome: editar.nome, turma: editar.turmaId, numero: editar.numero }} />}
     </div>
   );
 };
 
 /* -------- Ficha de leitura do aluno (admin) -------- */
 export const AdminAlunoFicha = ({ alunoId, back }) => {
-  const D = DATA;
   const [a, setA] = useState(null);
   useEffect(() => {
     let ativo = true;
@@ -255,9 +358,6 @@ export const AdminAlunoFicha = ({ alunoId, back }) => {
     return () => { ativo = false; };
   }, [alunoId]);
   if (!a) return <Carregando back={back} />;
-  const hist = a.histNivel || [];
-  const delta = hist.length ? a.nivelLeitura - hist[0].nivel : 0;
-  const nivelLabels = ['', 'N.lê', 'Síl', 'Pal', 'Fra', 'T-sf', 'T-cf'];
   return (
     <div className="fade-in">
       <button className="btn btn-subtle btn-sm" style={{ marginBottom: 16 }} onClick={back}><I name="chevL" size={15} />Voltar</button>
@@ -274,25 +374,8 @@ export const AdminAlunoFicha = ({ alunoId, back }) => {
         <button className="btn btn-ghost"><I name="download" size={15} />Relatório</button>
       </div>
 
-      <div className="grid" style={{ gridTemplateColumns: 'repeat(3,1fr)', marginBottom: 18 }}>
-        <Stat label="Nível de leitura atual" value={D.nivel(a.nivelLeitura).curto} sub={D.nivel(a.nivelLeitura).nome} icon="book" accent={['', '#d3433a', '#e0822b', '#d9b421', '#2f9bb0', '#2f74d0', '#15935f'][a.nivelLeitura]} />
-        <Stat label="Evolução no bimestre" value={delta > 0 ? '+' + delta : '0'} sub={delta > 0 ? 'níveis avançados' : 'estável'} icon="trend" accent="#15935f" />
-        <Stat label="Registros de leitura" value={hist.length} sub="no período" icon="history" accent="#0e8aa8" />
-      </div>
-
-      <div className="card card-pad">
-        <h3 style={{ fontSize: 15, marginBottom: 4 }}>Evolução do nível de leitura</h3>
-        <p style={{ fontSize: 12.5, color: 'var(--text-3)', marginBottom: 18 }}>Histórico de classificação ao longo do bimestre</p>
-        <LineChart labels={hist.map(h => h.data.slice(0, 5))} yMax={6} yLabels={nivelLabels}
-          series={[{ color: 'var(--primary)', data: hist.map(h => h.nivel) }]} height={210} />
-        <div style={{ display: 'flex', gap: 10, marginTop: 18, flexWrap: 'wrap' }}>
-          {hist.map((h, i) => (
-            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '8px 13px', background: 'var(--surface-2)', borderRadius: 10 }}>
-              <span className="num" style={{ fontSize: 12, color: 'var(--text-3)' }}>{h.data}</span>
-              <NivelPill nivel={h.nivel} full />
-            </div>
-          ))}
-        </div>
+      <div className="card card-pad" style={{ color: 'var(--text-3)', fontSize: 13 }}>
+        Acompanhamento por habilidade na Verificação Contínua.
       </div>
     </div>
   );
@@ -522,7 +605,6 @@ export const AdminConfig = () => {
       {[
         ['Componentes curriculares', 'Língua Portuguesa, Matemática', 'skills'],
         ['Períodos avaliativos', 'Bimestral · 4 períodos', 'calendar'],
-        ['Níveis de leitura', '6 níveis configurados', 'book'],
         ['Recuperação de senha', 'Via e-mail cadastrado', 'lock'],
       ].map((c, i) => (
         <div key={i} className="card card-pad" style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
@@ -548,10 +630,8 @@ export const AdminConfig = () => {
         <tbody>
           {[
             // [funcionalidade, secretaria, gestor, professor, admin]
-            ['Criar/arquivar orientações da rede', 1, 0, 0, 1],
             ['Cadastrar planejamento', 0, 1, 0, 1],
             ['Vincular habilidades BNCC', 0, 1, 0, 1],
-            ['Responder com trilha de aprendizagem', 0, 0, 1, 0],
             ['Editar atividades e recursos', 0, 0, 1, 0],
             ['Registrar verificação contínua', 0, 0, 1, 0],
             ['Classificar nível de leitura', 0, 0, 1, 0],

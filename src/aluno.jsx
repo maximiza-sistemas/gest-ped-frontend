@@ -3,7 +3,7 @@
    ============================================================ */
 import React, { useState } from 'react';
 import { DATA } from './data.js';
-import { I, Avatar, Stat, ResultadoBadge, LineChart, NivelPill } from './ui.jsx';
+import { I, Avatar, Stat, ResultadoBadge } from './ui.jsx';
 
 /* -------- Ficha individual do aluno -------- */
 export const FichaAluno = ({ alunoId, back }) => {
@@ -28,7 +28,10 @@ export const FichaAluno = ({ alunoId, back }) => {
     const p = s => s.split('/').reverse().join('');
     return p(y.data).localeCompare(p(x.data));
   });
-  const nivelLabels = ['', 'N.lê', 'Síl', 'Pal', 'Fra', 'T-sf', 'T-cf'];
+  const atingiu = todas.filter(t => t.resultado === 2).length;
+  const pctAtingiu = todas.length ? Math.round((atingiu / todas.length) * 100) : 0;
+  const ultima = todas[0] ? todas[0].data : '—';
+  const tabs = [['desempenho', 'Desempenho por habilidade'], ['historico', 'Histórico de avaliações']];
 
   return (
     <div className="fade-in">
@@ -42,7 +45,6 @@ export const FichaAluno = ({ alunoId, back }) => {
           <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
             <span className="chip">Nº {String(a.numero).padStart(2, '0')}</span>
             <span className="chip"><I name="users" size={13} />1º Ano A · Matutino</span>
-            <span className="chip"><I name="book" size={13} />Leitura: {D.nivel(a.nivelLeitura).nome}</span>
           </div>
         </div>
         <div style={{ display: 'flex', gap: 10 }}>
@@ -54,13 +56,13 @@ export const FichaAluno = ({ alunoId, back }) => {
       <div className="grid" style={{ gridTemplateColumns: 'repeat(4,1fr)', marginBottom: 18 }}>
         <Stat label="Habilidades avaliadas" value={habs.length} icon="skills" accent="#2563eb" />
         <Stat label="Total de avaliações" value={todas.length} icon="check" accent="#0e8aa8" />
-        <Stat label="Nível de leitura atual" value={D.nivel(a.nivelLeitura).curto} icon="book" accent={['','#d3433a','#e0822b','#d9b421','#2f9bb0','#2f74d0','#15935f'][a.nivelLeitura]} />
-        <Stat label="Evolução no bimestre" value={'+' + (a.nivelLeitura - a.histNivel[0].nivel)} sub="níveis avançados" icon="trend" accent="#15935f" />
+        <Stat label="Atingiu o esperado" value={pctAtingiu + '%'} sub={`${atingiu} de ${todas.length}`} icon="target" accent="#15935f" />
+        <Stat label="Última avaliação" value={ultima} icon="calendar" accent="#7c5cff" />
       </div>
 
       {/* tabs */}
       <div className="seg" style={{ marginBottom: 18 }}>
-        {[['desempenho', 'Desempenho por habilidade'], ['leitura', 'Evolução de leitura'], ['historico', 'Histórico de avaliações']].map(t => (
+        {tabs.map(t => (
           <button key={t[0]} className={tab === t[0] ? 'active' : ''} onClick={() => setTab(t[0])}>{t[1]}</button>
         ))}
       </div>
@@ -91,27 +93,6 @@ export const FichaAluno = ({ alunoId, back }) => {
               </div>
             );
           })}
-        </div>
-      )}
-
-      {tab === 'leitura' && (
-        <div className="card card-pad fade-in">
-          <h3 style={{ fontSize: 15, marginBottom: 4 }}>Evolução do nível de leitura</h3>
-          <p style={{ fontSize: 12.5, color: 'var(--text-3)', marginBottom: 18 }}>Histórico de classificação ao longo do bimestre</p>
-          <LineChart
-            labels={a.histNivel.map(h => h.data.slice(0, 5))}
-            yMax={6} yLabels={nivelLabels}
-            series={[{ color: 'var(--primary)', data: a.histNivel.map(h => h.nivel) }]}
-            height={210}
-          />
-          <div style={{ display: 'flex', gap: 10, marginTop: 18, flexWrap: 'wrap' }}>
-            {a.histNivel.map((h, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '8px 13px', background: 'var(--surface-2)', borderRadius: 10 }}>
-                <span className="num" style={{ fontSize: 12, color: 'var(--text-3)' }}>{h.data}</span>
-                <NivelPill nivel={h.nivel} full />
-              </div>
-            ))}
-          </div>
         </div>
       )}
 

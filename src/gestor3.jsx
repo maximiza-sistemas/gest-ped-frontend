@@ -1,61 +1,9 @@
 /* ============================================================
-   Gestor (parte 3) — Níveis de leitura, Professores & turmas,
-   Períodos avaliativos
+   Gestor (parte 3) — Professores & turmas, Períodos avaliativos
    ============================================================ */
 import React from 'react';
 import { DATA } from './data.js';
-import { PageHeader, I, Avatar, Bar, NivelPill } from './ui.jsx';
-
-/* -------- Configuração dos níveis de leitura -------- */
-export const NiveisConfig = () => {
-  const D = DATA;
-  return (
-    <div className="fade-in">
-      <PageHeader
-        title="Níveis de leitura"
-        subtitle="Defina e ordene os níveis de leitura que os professores usarão para classificar os alunos ao longo do ano."
-        actions={<button className="btn btn-primary"><I name="plus" size={15} />Adicionar nível</button>}
-      />
-      <div className="grid" style={{ gridTemplateColumns: '1fr 320px' }}>
-        <div className="card">
-          {D.NIVEIS.map((n, i) => (
-            <div key={n.id} style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '16px 22px', borderBottom: i < D.NIVEIS.length - 1 ? '1px solid var(--border)' : 'none' }}>
-              <div style={{ width: 30, height: 30, borderRadius: 8, background: n.cor, color: '#fff', display: 'grid', placeItems: 'center', fontWeight: 800, flex: 'none' }}>{n.id}</div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 700, fontSize: 14.5 }}>{n.nome}</div>
-                <div style={{ fontSize: 12.5, color: 'var(--text-3)' }}>{n.desc}</div>
-              </div>
-              <span className="chip">{D.distribuicaoNiveis(D.alunosT1)[i]} alunos · 1A</span>
-              <button className="icon-btn"><I name="edit" size={15} /></button>
-            </div>
-          ))}
-        </div>
-        <div>
-          <div className="card card-pad">
-            <div className="section-title">Escala de progressão</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-              {D.NIVEIS.map((n, i) => (
-                <div key={n.id} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                    <div style={{ width: 14, height: 14, borderRadius: '50%', background: n.cor, border: '3px solid #fff', boxShadow: '0 0 0 1.5px ' + n.cor }} />
-                    {i < D.NIVEIS.length - 1 && <div style={{ width: 2, height: 30, background: 'var(--border-strong)' }} />}
-                  </div>
-                  <div style={{ paddingBottom: i < D.NIVEIS.length - 1 ? 18 : 0 }}>
-                    <div style={{ fontWeight: 600, fontSize: 13 }}>{n.nome}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginTop: 10, padding: 13, background: 'var(--primary-50)', borderRadius: 11, fontSize: 12, color: 'var(--primary-800)' }}>
-              <I name="info" size={16} style={{ flex: 'none', marginTop: 1 }} />
-              <span>Os professores registram o nível de cada aluno e o sistema mantém o histórico de evolução.</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
+import { PageHeader, I, Avatar, Bar } from './ui.jsx';
 
 /* -------- Professores & turmas -------- */
 export const ProfessoresTurmas = ({ openAluno }) => {
@@ -99,10 +47,9 @@ export const ProfessoresTurmas = ({ openAluno }) => {
       <h3 style={{ fontSize: 15, marginBottom: 12 }}>Alunos · {D.TURMA_ATUAL?.nome || 'turma'}{D.TURMA_ATUAL?.escolaNome ? ' · ' + D.TURMA_ATUAL.escolaNome : ''}</h3>
       <div className="card">
         <table className="tbl">
-          <thead><tr><th style={{ width: 40 }}>Nº</th><th>Aluno</th><th>Nível de leitura</th><th>Evolução no bimestre</th><th></th></tr></thead>
+          <thead><tr><th style={{ width: 40 }}>Nº</th><th>Aluno</th><th></th></tr></thead>
           <tbody>
             {D.alunosT1.slice(0, 8).map(a => {
-              const ini = a.histNivel[0].nivel, fim = a.nivelLeitura, d = fim - ini;
               return (
                 <tr key={a.id} className="clickable" onClick={() => openAluno(a.id)}>
                   <td className="num" style={{ color: 'var(--text-3)' }}>{String(a.numero).padStart(2, '0')}</td>
@@ -112,8 +59,6 @@ export const ProfessoresTurmas = ({ openAluno }) => {
                       <span style={{ fontWeight: 600 }}>{a.nome}</span>
                     </div>
                   </td>
-                  <td><NivelPill nivel={a.nivelLeitura} full /></td>
-                  <td>{d > 0 ? <span className="badge badge-green"><I name="arrowUp" size={11} sw={2.6} />+{d} {d > 1 ? 'níveis' : 'nível'}</span> : <span className="badge badge-gray">Estável</span>}</td>
                   <td style={{ textAlign: 'right' }}><I name="chevR" size={16} style={{ color: 'var(--text-4)' }} /></td>
                 </tr>
               );

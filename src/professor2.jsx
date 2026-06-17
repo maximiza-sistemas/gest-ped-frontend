@@ -1,156 +1,10 @@
 /* ============================================================
-   Professor (parte 2) — Níveis de leitura, Meus alunos,
-   Meu planejamento
+   Professor (parte 2) — Meus alunos, Meu planejamento
    ============================================================ */
-import React, { useState, useEffect } from 'react';
-import { DATA, registrarLeituraLote, salvarSemanas, fetchTurmaFull } from './store.js';
-import { PageHeader, I, Avatar, NivelPill, MatrizBadge } from './ui.jsx';
+import React, { useState } from 'react';
+import { DATA, salvarSemanas } from './store.js';
+import { PageHeader, I, Avatar } from './ui.jsx';
 import { meuPlano } from './professor.jsx';
-
-/* -------- Níveis de leitura (classificar + evolução) -------- */
-export const NiveisLeitura = ({ openAluno }) => {
-  const D = DATA;
-  // turmas em que o professor leciona (seletor de turma)
-  const prof = D.PROFESSORES.find(p => p.id === D.CURRENT_USER?.profId);
-  const minhasTurmas = (prof?.turmaIds || []).map(id => D.TURMAS.find(t => t.id === id)).filter(Boolean);
-  const turmasDisp = minhasTurmas.length ? minhasTurmas : (D.TURMA_ATUAL ? [D.TURMA_ATUAL] : D.TURMAS.slice(0, 1));
-  const turmaNome = id => (turmasDisp.find(t => t.id === id) || {}).nome || '';
-
-  const [turmaSel, setTurmaSel] = useState(turmasDisp[0]?.id || null);
-  const [dataAplicacao, setDataAplicacao] = useState('15/04/2026');
-  const [alunos, setAlunos] = useState(() => D.alunosT1.map(a => ({ ...a })));
-  const [editId, setEditId] = useState(null);
-  const [erro, setErro] = useState(null);
-
-  // carrega o roster da turma selecionada
-  useEffect(() => {
-    if (!turmaSel) return;
-    if (D.TURMA_ATUAL && turmaSel === D.TURMA_ATUAL.id) { setAlunos(D.alunosT1.map(a => ({ ...a }))); return; }
-    let ativo = true;
-    fetchTurmaFull(turmaSel).then(t => { if (ativo) setAlunos(t.alunos.map(a => ({ ...a }))); }).catch(() => {});
-    return () => { ativo = false; };
-  }, [turmaSel]);
-
-  const dist = [0, 0, 0, 0, 0, 0];
-  alunos.forEach(a => dist[a.nivelLeitura - 1]++);
-
-  const setNivel = (id, nv) => {
-    const atual = alunos.find(a => a.id === id);
-    // atualização otimista; a API persiste e o store re-hidrata a turma
-    setAlunos(list => list.map(a => a.id === id
-      ? { ...a, nivelLeitura: nv, justAdvanced: nv > a.nivelLeitura, aplicadoEm: dataAplicacao,
-          histNivel: [...a.histNivel, { data: dataAplicacao, nivel: nv }] }
-      : a));
-    setEditId(null);
-    setErro(null);
-    registrarLeituraLote({ data: dataAplicacao, turmaId: turmaSel, registros: [{ alunoId: id, nivel: nv }] })
-      .catch(err => {
-        setErro(`Falha ao salvar o nível de ${atual?.nome || id}: ${err.message}`);
-        if (turmaSel) fetchTurmaFull(turmaSel).then(t => setAlunos(t.alunos.map(a => ({ ...a })))).catch(() => {}); // desfaz a otimista
-      });
-  };
-
-  return (
-    <div className="fade-in">
-      <PageHeader
-        title="Níveis de leitura"
-        subtitle="Classifique cada aluno no nível de leitura atual. O sistema mantém o histórico de evolução ao longo do período."
-        actions={<button className="btn btn-ghost"><I name="download" size={15} />Exportar</button>}
-      />
-
-      {erro && (
-        <div style={{ display: 'flex', gap: 9, alignItems: 'center', padding: '11px 14px', borderRadius: 10, background: 'var(--red-bg)', color: 'var(--red)', fontSize: 13, fontWeight: 600, marginBottom: 14 }}>
-          <I name="info" size={16} />{erro}
-        </div>
-      )}
-
-      {/* distribuição */}
-      <div className="card card-pad" style={{ marginBottom: 18 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, gap: 12, flexWrap: 'wrap' }}>
-          <h3 style={{ fontSize: 15 }}>Distribuição da turma · {alunos.length} alunos</h3>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-            {turmasDisp.length > 1 ? (
-              <select className="input" value={turmaSel || ''} onChange={e => setTurmaSel(e.target.value)} style={{ height: 34, fontSize: 13, width: 200 }}>
-                {turmasDisp.map(t => <option key={t.id} value={t.id}>{t.nome}{t.turno ? ' · ' + t.turno : ''}</option>)}
-              </select>
-            ) : (
-              <span style={{ fontSize: 12.5, color: 'var(--text-3)' }}>{turmaNome(turmaSel)} · {D.periodoNome((D.PERIODOS.find(p => p.atual) || {}).id)}</span>
-            )}
-            <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-2)' }}>Data da aplicação:</span>
-            <div style={{ position: 'relative', width: 148 }}>
-              <input className="input" value={dataAplicacao} onChange={e => setDataAplicacao(e.target.value)} style={{ paddingLeft: 32, height: 34, fontSize: 13 }} />
-              <I name="calendar" size={14} style={{ position: 'absolute', left: 10, top: 10, color: 'var(--text-3)' }} />
-            </div>
-          </div>
-        </div>
-        <div style={{ display: 'flex', height: 30, borderRadius: 9, overflow: 'hidden', marginBottom: 14 }}>
-          {D.NIVEIS.map((n, i) => dist[i] > 0 && (
-            <div key={n.id} style={{ width: (dist[i] / alunos.length * 100) + '%', background: n.cor, display: 'grid', placeItems: 'center', color: '#fff', fontWeight: 700, fontSize: 12 }} title={n.nome}>
-              {dist[i]}
-            </div>
-          ))}
-        </div>
-        <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap' }}>
-          {D.NIVEIS.map((n, i) => (
-            <span key={n.id} style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12.5 }}>
-              <span style={{ width: 10, height: 10, borderRadius: 3, background: n.cor }} />
-              <span style={{ color: 'var(--text-2)' }}>{n.nome}</span>
-              <b className="num">{dist[i]}</b>
-            </span>
-          ))}
-        </div>
-      </div>
-
-      {/* lista de alunos */}
-      <div className="card">
-        <table className="tbl">
-          <thead><tr><th style={{ width: 36 }}>Nº</th><th>Aluno</th><th style={{ width: 260 }}>Nível atual</th><th style={{ textAlign: 'right' }}>Última aplicação</th></tr></thead>
-          <tbody>
-            {alunos.map(a => {
-              return (
-                <tr key={a.id}>
-                  <td className="num" style={{ color: 'var(--text-3)' }}>{String(a.numero).padStart(2, '0')}</td>
-                  <td>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }} onClick={() => openAluno(a.id)}>
-                      <Avatar nome={a.nome} iniciais={a.iniciais} cor="#64748b" size={30} />
-                      <span style={{ fontWeight: 600 }}>{a.nome}</span>
-                    </div>
-                  </td>
-                  <td>
-                    {editId === a.id ? (
-                      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                        {D.NIVEIS.map(n => (
-                          <button key={n.id} onClick={() => setNivel(a.id, n.id)}
-                            style={{ padding: '4px 9px', borderRadius: 7, fontSize: 11.5, fontWeight: 700, border: '1.5px solid ' + n.cor,
-                              background: a.nivelLeitura === n.id ? n.cor : 'transparent', color: a.nivelLeitura === n.id ? '#fff' : n.cor }}>
-                            {n.curto}
-                          </button>
-                        ))}
-                      </div>
-                    ) : (
-                      <button onClick={() => setEditId(a.id)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 11px', borderRadius: 8, border: '1px solid var(--border-strong)', background: 'var(--surface)' }}>
-                        <NivelPill nivel={a.nivelLeitura} full />
-                        <I name="edit" size={13} style={{ color: 'var(--text-3)', marginLeft: 4 }} />
-                      </button>
-                    )}
-                  </td>
-                  <td style={{ textAlign: 'right' }}>
-                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, justifyContent: 'flex-end' }}>
-                      {a.justAdvanced && <span className="badge badge-green fade-in"><I name="trend" size={11} />avançou</span>}
-                      <span className="num" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11.5, color: a.aplicadoEm ? 'var(--text-2)' : 'var(--text-3)' }}>
-                        <I name="calendar" size={11} />{a.aplicadoEm || a.histNivel[a.histNivel.length - 1].data}
-                      </span>
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-};
 
 /* -------- Meus alunos -------- */
 export const MeusAlunos = ({ openAluno }) => {
@@ -167,7 +21,6 @@ export const MeusAlunos = ({ openAluno }) => {
       <div className="grid" style={{ gridTemplateColumns: 'repeat(3,1fr)' }}>
         {list.map(a => {
           const avals = ['EF01LP01', 'EF01LP02', 'EF01LP04', 'EF01LP07'].reduce((s, h) => s + D.avalCount(a.id, h), 0);
-          const d = a.nivelLeitura - a.histNivel[0].nivel;
           return (
             <button key={a.id} className="card card-pad" style={{ textAlign: 'left', display: 'flex', flexDirection: 'column', gap: 12, transition: 'box-shadow .15s, transform .15s' }}
               onClick={() => openAluno(a.id)}
@@ -181,8 +34,8 @@ export const MeusAlunos = ({ openAluno }) => {
                 </div>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 11, borderTop: '1px solid var(--border)' }}>
-                <NivelPill nivel={a.nivelLeitura} full />
                 <span style={{ fontSize: 12, color: 'var(--text-3)' }}><b className="num" style={{ color: 'var(--text-2)' }}>{avals}</b> avaliações</span>
+                <span style={{ fontSize: 12, color: 'var(--text-3)', display: 'flex', alignItems: 'center', gap: 4 }}>Ver ficha<I name="chevR" size={14} /></span>
               </div>
             </button>
           );

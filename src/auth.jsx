@@ -52,10 +52,10 @@ export const Login = ({ onLogin }) => {
             Planejamento, verificação contínua e evolução — em um só lugar.
           </h1>
           <p style={{ color: '#aab8cf', fontSize: 15, marginTop: 18, lineHeight: 1.6 }}>
-            Acompanhe o desenvolvimento de habilidades e os níveis de leitura de cada aluno com decisões baseadas em dados.
+            Acompanhe o desenvolvimento das habilidades de cada aluno com decisões baseadas em dados.
           </p>
           <div style={{ display: 'flex', gap: 26, marginTop: 34 }}>
-            {[['6', 'escolas na rede'], ['4', 'matrizes de referência'], ['6', 'níveis de leitura']].map((s, i) => (
+            {[['6', 'escolas na rede'], ['4', 'matrizes de referência'], ['4', 'perfis de acesso']].map((s, i) => (
               <div key={i}>
                 <div className="num" style={{ fontSize: 26, fontWeight: 800 }}>{s[0]}</div>
                 <div style={{ fontSize: 12, color: '#8fa3c0' }}>{s[1]}</div>
@@ -66,9 +66,9 @@ export const Login = ({ onLogin }) => {
         <div style={{ position: 'relative', fontSize: 12, color: '#6f82a0' }}>EMEF Anísio Teixeira · Ano letivo 2026</div>
       </div>
 
-      {/* Lado direito — acesso */}
-      <div style={{ display: 'grid', placeItems: 'center', padding: 40, background: 'var(--surface)' }}>
-        <form style={{ width: '100%', maxWidth: 392 }} className="fade-in" onSubmit={entrar}>
+      {/* Lado direito — acesso (rola quando o conteúdo passa da altura da viewport) */}
+      <div style={{ display: 'flex', overflowY: 'auto', padding: 40, background: 'var(--surface)' }}>
+        <form style={{ width: '100%', maxWidth: 392, margin: 'auto' }} className="fade-in" onSubmit={entrar}>
           <h2 style={{ fontSize: 24, letterSpacing: '-.02em' }}>Entrar na plataforma</h2>
           <p style={{ color: 'var(--text-2)', marginTop: 6, marginBottom: 26 }}>Selecione seu perfil de acesso para continuar.</p>
 

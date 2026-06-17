@@ -9,7 +9,6 @@ const RES_COR   = { 1: 'red', 2: 'green' };
 
 export const DATA = {
   // ---------- catálogos (hidratados de GET /meta) ----------
-  NIVEIS: [],
   COMPONENTES: [],
   PERIODOS: [],
   HABILIDADES: [],
@@ -21,11 +20,9 @@ export const DATA = {
   ESCOLA: { nome: '', rede: '', ano: '' },
   REDE: { municipio: '', secretaria: '', uf: '', ano: '' },
 
-  // séries (anos) do ensino fundamental — anos iniciais
-  ANOS: [1, 2, 3, 4, 5],
-
-  // ---------- orientações (gestor) + trilhas (professor) ----------
-  ORIENTACOES: [],
+  // séries (anos escolares) — catálogo configurável, hidratado de GET /meta
+  // [{ ordem, nome }]; `ordem` é o inteiro usado em Turma.ano e Planejamento.anos
+  ANOS: [1, 2, 3, 4, 5].map(n => ({ ordem: n, nome: n + 'º ano' })),
 
   // ---------- grupos de escolas (admin/secretaria) ----------
   GRUPOS: { grupos: [], semGrupo: [] },
@@ -63,20 +60,14 @@ export const DATA = {
     const a = DATA.AVALIACOES[alunoId];
     return a && a[hab] ? a[hab].length : 0;
   },
-  distribuicaoNiveis: alunos => {
-    const d = [0, 0, 0, 0, 0, 0];
-    alunos.forEach(a => d[a.nivelLeitura - 1]++);
-    return d;
-  },
   compNome: id => (DATA.COMPONENTES.find(c => c.id === id) || {}).nome || id,
   turmaNome: id => (DATA.TURMAS.find(t => t.id === id) || {}).nome || id,
   profNome: id => (DATA.PROFESSORES.find(p => p.id === id) || {}).nome || id,
   escolaNome: id => (DATA.ESCOLAS.find(e => e.id === id) || {}).nome || id,
   usuarioNome: id => (DATA.USUARIOS.find(u => u.id === id) || {}).nome || id,
-  anoNome: a => a + 'º ano',
+  anoNome: ordem => (DATA.ANOS.find(a => a.ordem === ordem) || {}).nome || ordem + 'º ano',
   prof: id => DATA.PROFESSORES.find(p => p.id === id),
   periodoNome: id => (DATA.PERIODOS.find(p => p.id === id) || {}).nome || id,
-  nivel: id => DATA.NIVEIS.find(n => n.id === id),
   matriz: id => DATA.MATRIZES.find(m => m.id === id),
   rotulo: cod => (DATA.habByCod[cod] || {}).rotulo || cod,
 };

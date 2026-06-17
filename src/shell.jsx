@@ -35,9 +35,7 @@ const NAV = {
     ]},
     { grupo: 'Planejamento', itens: [
       { id: 'planejamentos', label: 'Planejamentos', icon: 'plan', badge: '3' },
-      { id: 'orientacoes', label: 'Orientações', icon: 'target' },
       { id: 'habilidades', label: 'Matrizes & habilidades', icon: 'skills' },
-      { id: 'niveis', label: 'Níveis de leitura', icon: 'book' },
     ]},
     { grupo: 'Acompanhamento', itens: [
       { id: 'professores', label: 'Professores & turmas', icon: 'users' },
@@ -49,7 +47,6 @@ const NAV = {
       { id: 'painel', label: 'Meu painel', icon: 'dashboard' },
       { id: 'verificacao', label: 'Verificação contínua', icon: 'check', badge: '4' },
       // 'Níveis de leitura' removido do menu provisoriamente (discussão futura) — rota mantida
-      { id: 'orientacoesprof', label: 'Orientações', icon: 'target' },
     ]},
     { grupo: 'Turma', itens: [
       { id: 'alunos', label: 'Meus alunos', icon: 'users' },
@@ -64,9 +61,9 @@ const NAV = {
     ]},
     { grupo: 'Pedagógico', itens: [
       { id: 'planejamentos', label: 'Planejamentos', icon: 'plan' },
-      { id: 'orientacoes', label: 'Orientações', icon: 'target' },
     ]},
     { grupo: 'Cadastros', itens: [
+      { id: 'admanos', label: 'Anos escolares', icon: 'grad' },
       { id: 'admturmas', label: 'Turmas', icon: 'grid' },
       { id: 'admalunos', label: 'Alunos', icon: 'users' },
     ]},
@@ -83,20 +80,17 @@ NAV.secretaria = NAV.admin;
 const TITLES = {
   dashboard: ['Dashboard consolidado', 'Visão geral do andamento de todos os professores e turmas'],
   planejamentos: ['Planejamentos', 'Cadastre, vincule habilidades e direcione aos professores'],
-  orientacoes: ['Orientações pedagógicas', 'Indique habilidades e escopo; acompanhe as trilhas dos professores'],
   habilidades: ['Matrizes & habilidades', 'Catálogo por matriz de referência: BNCC, SAEB, SEAMA e Habilidades Leitoras'],
-  niveis: ['Níveis de leitura', 'Defina os níveis acompanhados ao longo do ano'],
   professores: ['Professores & turmas', 'Acompanhe o trabalho de cada professor'],
   periodos: ['Períodos avaliativos', 'Períodos avaliativos do ano letivo'],
   painel: ['Meu painel', 'Habilidades direcionadas para o período vigente'],
   verificacao: ['Verificação contínua', 'Registre o desempenho individual dos alunos'],
-  leitura: ['Níveis de leitura', 'Classifique e acompanhe a evolução da leitura'],
-  orientacoesprof: ['Orientações', 'Orientações da coordenação e suas trilhas de aprendizagem'],
   alunos: ['Meus alunos', 'Turma 1º Ano A · 24 alunos'],
   planoprof: ['Meu planejamento', 'Edite atividades e estratégias do planejamento recebido'],
-  admrede: ['Visão da rede', 'Indicadores de alfabetização e leitura de toda a rede'],
+  admrede: ['Visão da rede', 'Indicadores da rede de ensino'],
   admescolas: ['Escolas', 'Unidades escolares da rede municipal'],
   admgrupos: ['Grupos de escolas', 'Organize as escolas da rede em grupos (polos)'],
+  admanos: ['Anos escolares', 'Séries usadas para direcionar os planejamentos'],
   admturmas: ['Turmas', 'Todas as turmas da rede, por escola e ano'],
   admalunos: ['Alunos', 'Diretório de estudantes da rede'],
   admusers: ['Usuários & acessos', 'Gestão de contas e permissões'],

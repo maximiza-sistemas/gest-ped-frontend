@@ -19,22 +19,36 @@ export const meuPlano = () => {
 /* -------- Meu painel -------- */
 export const ProfessorPainel = ({ go }) => {
   const D = DATA;
-  const pl = meuPlano();
-  if (!pl) return (
+  // professor logado e seu componente — só vê habilidades do seu componente
+  const prof = D.PROFESSORES.find(p => p.id === D.CURRENT_USER?.profId);
+  const profComp = prof ? prof.comp : null;
+  const doComp = c => !profComp || (D.habByCod[c] || {}).comp === profComp;
+  const ativos = D.PLANEJAMENTOS.filter(p => p.status === 'ativo');
+  const meses = D.PERIODOS.filter(p => ativos.some(a => a.periodo === p.id && a.habilidades.some(doComp))); // meses com direcionamento p/ o professor
+  const mesAtual = (D.PERIODOS.find(p => p.atual) || {}).id;
+  const [mesSel, setMesSel] = useState(meses.some(m => m.id === mesAtual) ? mesAtual : (meses[0] ? meses[0].id : null));
+
+  if (!meses.length) return (
     <div className="fade-in">
-      <PageHeader title="Meu painel" subtitle="Habilidades direcionadas pela Secretaria de Educação para o mês." />
+      <PageHeader title="Meu painel" subtitle="Habilidades direcionadas pela Secretaria de Educação por mês." />
       <div className="card card-pad" style={{ textAlign: 'center', padding: '48px 24px', color: 'var(--text-2)' }}>
         <div style={{ width: 56, height: 56, borderRadius: 14, background: 'var(--surface-3)', color: 'var(--text-3)', display: 'grid', placeItems: 'center', margin: '0 auto 16px' }}><I name="plan" size={28} /></div>
-        <h3 style={{ fontSize: 16, marginBottom: 6 }}>Nenhum planejamento no momento</h3>
-        <p style={{ fontSize: 13.5, maxWidth: 420, margin: '0 auto' }}>Quando a Secretaria publicar o planejamento do mês, as habilidades aparecerão aqui.</p>
+        <h3 style={{ fontSize: 16, marginBottom: 6 }}>Nenhum planejamento direcionado</h3>
+        <p style={{ fontSize: 13.5, maxWidth: 420, margin: '0 auto' }}>Quando a Secretaria publicar o planejamento de um mês, as habilidades aparecerão aqui.</p>
       </div>
     </div>
   );
-  const trab = D.TRABALHO[pl.id] || {};
-  const habs = pl.habilidades.map(c => ({ cod: c, ...D.habByCod[c], ...(trab[c] || { status: 'pendente', avaliacoes: 0 }) }));
+
+  // habilidades do componente do professor, agregadas dos planejamentos do mês (cada uma com seu trabalho)
+  const planosMes = ativos.filter(p => p.periodo === mesSel && p.habilidades.some(doComp));
+  const habs = planosMes.flatMap(pl => pl.habilidades.filter(doComp).map(c => {
+    const t = (D.TRABALHO[pl.id] || {})[c] || { status: 'pendente', avaliacoes: 0 };
+    return { cod: c, planoId: pl.id, ...D.habByCod[c], ...t };
+  }));
+  const total = habs.length || 1; // evita divisão por zero
   const trabalhadas = habs.filter(h => h.status === 'trabalhada').length;
   const pendentes = habs.filter(h => h.status === 'pendente').length;
-  const totAval = habs.reduce((s, h) => s + h.avaliacoes, 0);
+  const totAval = habs.reduce((s, h) => s + (h.avaliacoes || 0), 0);
   const stMap = { trabalhada: ['badge-green', 'Trabalhada'], andamento: ['badge-amber', 'Em andamento'], pendente: ['badge-gray', 'Pendente'] };
   const proximas = habs.filter(h => h.proxima).map(h => ({ cod: h.cod, rotulo: h.rotulo || h.cod, txt: h.proxima }));
 
@@ -42,31 +56,42 @@ export const ProfessorPainel = ({ go }) => {
     <div className="fade-in">
       <PageHeader
         title="Meu painel"
-        subtitle={`Habilidades direcionadas pela Secretaria de Educação para ${D.periodoNome(pl.periodo)}. Preencha o planejamento semanal e registre a verificação contínua dos alunos.`}
-        actions={<button className="btn btn-primary" onClick={() => go('verificacao')}><I name="check" size={15} />Nova verificação</button>}
+        subtitle="Habilidades direcionadas pela Secretaria de Educação. Selecione o mês, preencha o planejamento semanal e registre a verificação contínua."
+        actions={<>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <I name="calendar" size={15} style={{ color: 'var(--text-3)' }} />
+            <select className="input" value={mesSel} onChange={e => setMesSel(e.target.value)} style={{ height: 38, width: 180 }}>
+              {meses.map(m => <option key={m.id} value={m.id}>{m.nome}{m.id === mesAtual ? ' (mês atual)' : ''}</option>)}
+            </select>
+          </div>
+          <button className="btn btn-primary" onClick={() => go('verificacao')}><I name="check" size={15} />Nova verificação</button>
+        </>}
       />
 
       <div className="grid" style={{ gridTemplateColumns: 'repeat(4,1fr)', marginBottom: 18 }}>
-        <Stat label="Habilidades direcionadas" value={habs.length} sub="LP · 1º Ano A" icon="skills" accent="#2563eb" />
-        <Stat label="Trabalhadas" value={trabalhadas} sub={`${Math.round(trabalhadas / habs.length * 100)}% do planejamento`} icon="check2" accent="#15935f" />
+        <Stat label="Habilidades direcionadas" value={habs.length} sub={`${planosMes.length} planejamento${planosMes.length === 1 ? '' : 's'} · ${D.periodoNome(mesSel)}`} icon="skills" accent="#2563eb" />
+        <Stat label="Trabalhadas" value={trabalhadas} sub={`${Math.round(trabalhadas / total * 100)}% do planejamento`} icon="check2" accent="#15935f" />
         <Stat label="Pendentes" value={pendentes} sub="ainda não iniciadas" icon="flag" accent="#c77a07" />
-        <Stat label="Avaliações realizadas" value={totAval} sub="no período" icon="check" accent="#0e8aa8" />
+        <Stat label="Avaliações realizadas" value={totAval} sub={D.periodoNome(mesSel)} icon="check" accent="#0e8aa8" />
       </div>
 
       <div className="grid" style={{ gridTemplateColumns: '1fr 320px' }}>
         {/* habilidades */}
         <div className="card">
-          <div className="card-pad" style={{ borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
-              <h3 style={{ fontSize: 15 }}>Habilidades do período</h3>
-              <p style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>{pl.titulo}</p>
+          <div className="card-pad" style={{ borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+            <div style={{ minWidth: 0 }}>
+              <h3 style={{ fontSize: 15 }}>Habilidades de {D.periodoNome(mesSel)}</h3>
+              <p style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{planosMes.map(p => p.titulo).join(' · ') || 'Sem planejamento'}</p>
             </div>
-            <span className="chip"><I name="lock" size={12} />Definidas pela Secretaria</span>
+            <span className="chip" style={{ flex: 'none' }}><I name="lock" size={12} />Definidas pela Secretaria</span>
           </div>
+          {habs.length === 0 && (
+            <div style={{ padding: '28px 22px', textAlign: 'center', color: 'var(--text-3)', fontSize: 13.5 }}>Sem habilidades direcionadas neste mês.</div>
+          )}
           {habs.map(h => {
-            const [cls, lbl] = stMap[h.status];
+            const [cls, lbl] = stMap[h.status] || stMap.pendente;
             return (
-              <div key={h.cod} style={{ padding: '15px 22px', borderBottom: '1px solid var(--border)' }}>
+              <div key={h.planoId + ':' + h.cod} style={{ padding: '15px 22px', borderBottom: '1px solid var(--border)' }}>
                 <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
                   <span className="code-pill" style={{ marginTop: 2 }}>{h.rotulo || h.cod}</span>
                   <div style={{ flex: 1 }}>
@@ -112,10 +137,10 @@ export const ProfessorPainel = ({ go }) => {
           <div className="card card-pad">
             <div className="section-title">Progresso do planejamento</div>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 10 }}>
-              <span className="num" style={{ fontSize: 30, fontWeight: 800 }}>{Math.round((habs.length - pendentes) / habs.length * 100)}%</span>
+              <span className="num" style={{ fontSize: 30, fontWeight: 800 }}>{Math.round((habs.length - pendentes) / total * 100)}%</span>
               <span style={{ fontSize: 12.5, color: 'var(--text-3)' }}>iniciado</span>
             </div>
-            <Bar value={(habs.length - pendentes) / habs.length * 100} height={10} />
+            <Bar value={(habs.length - pendentes) / total * 100} height={10} />
             <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 14, fontSize: 12.5 }}>
               <span style={{ color: 'var(--text-3)' }}>{trabalhadas} concluídas</span>
               <span style={{ color: 'var(--text-3)' }}>{pendentes} pendentes</span>
@@ -135,21 +160,35 @@ const RESULTS = [
 
 export const VerificacaoContinua = ({ openAluno }) => {
   const D = DATA;
-  const pl = meuPlano();
-  // turmas em que o professor leciona (para o seletor de turma)
+  // professor logado e seu componente — só vê habilidades do seu componente
   const prof = D.PROFESSORES.find(p => p.id === D.CURRENT_USER?.profId);
+  const profComp = prof ? prof.comp : null;
+  const ativos = D.PLANEJAMENTOS.filter(p => p.status === 'ativo');
+  // habilidades direcionadas em um mês, do componente do professor (com plano de origem)
+  const habsDoMes = mes => ativos.filter(p => p.periodo === mes)
+    .flatMap(p => p.habilidades.map(c => ({ cod: c, planoId: p.id })))
+    .filter(h => !profComp || (D.habByCod[h.cod] || {}).comp === profComp);
+  const meses = D.PERIODOS.filter(p => habsDoMes(p.id).length > 0); // só meses com direcionamento para o professor
+  const mesAtual = (D.PERIODOS.find(p => p.atual) || {}).id;
+  const mesInicial = meses.some(m => m.id === mesAtual) ? mesAtual : (meses[0] ? meses[0].id : null);
+
+  // turmas em que o professor leciona (para o seletor de turma)
   const minhasTurmas = (prof?.turmaIds || []).map(id => D.TURMAS.find(t => t.id === id)).filter(Boolean);
   const turmasDisp = minhasTurmas.length ? minhasTurmas : (D.TURMA_ATUAL ? [D.TURMA_ATUAL] : D.TURMAS.slice(0, 1));
 
+  const [mesSel, setMesSel] = useState(mesInicial);
   const [turmaSel, setTurmaSel] = useState(turmasDisp[0]?.id || null);
+  const [habSel, setHabSel] = useState(habsDoMes(mesInicial)[0]?.cod || null);
   const [alunos, setAlunos] = useState(D.alunosT1);
   const [avaliacoes, setAvaliacoes] = useState(D.AVALIACOES);
-  const [habSel, setHabSel] = useState(pl?.habilidades?.[0] || null);
   const [data, setData] = useState('15/04/2026');
   const [marks, setMarks] = useState({}); // alunoId -> resultado (rodada atual)
   const [saved, setSaved] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState(null);
+
+  // ao trocar de mês, limpa a rodada atual (a habilidade ativa é recalculada abaixo)
+  useEffect(() => { setMarks({}); setSaved(false); }, [mesSel]);
 
   // carrega o roster + avaliações da turma selecionada
   useEffect(() => {
@@ -162,25 +201,33 @@ export const VerificacaoContinua = ({ openAluno }) => {
     return () => { ativo = false; };
   }, [turmaSel]);
 
-  if (!pl) return (
+  if (!meses.length) return (
     <div className="fade-in">
       <PageHeader title="Verificação contínua" subtitle="Registre o desempenho individual dos alunos nas habilidades direcionadas." />
       <div className="card card-pad" style={{ color: 'var(--text-3)' }}>Nenhum planejamento direcionado no momento.</div>
     </div>
   );
 
-  const hab = D.habByCod[habSel] || {};
+  // habilidades do mês selecionado + mapa habilidade → planejamento de origem
+  const habsMes = habsDoMes(mesSel);
+  const habCods = habsMes.map(h => h.cod);
+  const planoDaHab = Object.fromEntries(habsMes.map(h => [h.cod, h.planoId]));
+  const habAtivo = habCods.includes(habSel) ? habSel : (habCods[0] || null); // robusto à troca de mês
+  const planoIdSel = planoDaHab[habAtivo];
+
+  const hab = D.habByCod[habAtivo] || {};
   const marcados = Object.keys(marks).length;
-  const trab = D.TRABALHO[pl.id] || {};
-  const vezesAvaliada = (trab[habSel] && trab[habSel].avaliacoes) || 0;
+  const trab = D.TRABALHO[planoIdSel] || {};
+  const vezesAvaliada = (trab[habAtivo] && trab[habAtivo].avaliacoes) || 0;
 
   const setMark = (id, v) => { setMarks(m => ({ ...m, [id]: v })); setSaved(false); };
   const marcarTodos = v => { const o = {}; alunos.forEach(a => o[a.id] = v); setMarks(o); setSaved(false); };
   const registrar = async () => {
+    if (!planoIdSel || !habAtivo) return;
     setSalvando(true);
     setErro(null);
     try {
-      const av = await registrarAvaliacaoLote({ planejamentoId: pl.id, habCod: habSel, turmaId: turmaSel, data, marks });
+      const av = await registrarAvaliacaoLote({ planejamentoId: planoIdSel, habCod: habAtivo, turmaId: turmaSel, data, marks });
       setAvaliacoes(av || {});
       setSaved(true);
       setTimeout(() => { setMarks({}); setSaved(false); }, 1800);
@@ -194,8 +241,8 @@ export const VerificacaoContinua = ({ openAluno }) => {
   const dist = [0, 0];
   Object.values(marks).forEach(v => dist[v - 1]++);
 
-  // acompanhamento das habilidades leitoras (matriz LEITORA) na turma selecionada
-  const leitoras = pl.habilidades.filter(c => (D.habByCod[c] || {}).matriz === 'LEITORA').map(cod => {
+  // acompanhamento das habilidades leitoras (matriz LEITORA) do mês, na turma selecionada
+  const leitoras = habCods.filter(c => (D.habByCod[c] || {}).matriz === 'LEITORA').map(cod => {
     const h = D.habByCod[cod] || {};
     let avaliados = 0, atingiram = 0;
     alunos.forEach(a => {
@@ -215,8 +262,14 @@ export const VerificacaoContinua = ({ openAluno }) => {
       {/* seletor de habilidade */}
       <div className="card card-pad" style={{ marginBottom: 18 }}>
         <div style={{ display: 'flex', gap: 20, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+          <div style={{ width: 150 }}>
+            <label className="field-label">Período (mês)</label>
+            <select className="input" value={mesSel || ''} onChange={e => setMesSel(e.target.value)}>
+              {meses.map(m => <option key={m.id} value={m.id}>{m.nome}{m.id === mesAtual ? ' (atual)' : ''}</option>)}
+            </select>
+          </div>
           {turmasDisp.length > 1 && (
-            <div style={{ width: 220 }}>
+            <div style={{ width: 200 }}>
               <label className="field-label">Turma avaliada</label>
               <select className="input" value={turmaSel || ''} onChange={e => setTurmaSel(e.target.value)}>
                 {turmasDisp.map(t => <option key={t.id} value={t.id}>{t.nome}{t.turno ? ' · ' + t.turno : ''}</option>)}
@@ -225,11 +278,11 @@ export const VerificacaoContinua = ({ openAluno }) => {
           )}
           <div style={{ flex: 1, minWidth: 240 }}>
             <label className="field-label">Habilidade avaliada</label>
-            <select className="input" value={habSel} onChange={e => { setHabSel(e.target.value); setMarks({}); setSaved(false); }}>
-              {D.MATRIZES.filter(m => pl.habilidades.some(c => (D.habByCod[c] || {}).matriz === m.id)).map(m => (
+            <select className="input" value={habAtivo || ''} onChange={e => { setHabSel(e.target.value); setMarks({}); setSaved(false); }}>
+              {D.MATRIZES.filter(m => habCods.some(c => (D.habByCod[c] || {}).matriz === m.id)).map(m => (
                 <optgroup key={m.id} label={m.nome + ' — ' + m.desc}>
-                  {pl.habilidades.filter(c => (D.habByCod[c] || {}).matriz === m.id).map(c => (
-                    <option key={c} value={c}>{(D.habByCod[c].rotulo || c)} — {D.habByCod[c].desc.slice(0, 52)}…</option>
+                  {habCods.filter(c => (D.habByCod[c] || {}).matriz === m.id).map(c => (
+                    <option key={c} value={c}>{(D.habByCod[c].rotulo || c)} — {(D.habByCod[c].desc || '').slice(0, 52)}…</option>
                   ))}
                 </optgroup>
               ))}
@@ -248,7 +301,7 @@ export const VerificacaoContinua = ({ openAluno }) => {
           </div>
         </div>
         <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginTop: 16, padding: 13, background: 'var(--surface-2)', borderRadius: 11, fontSize: 12.5, color: 'var(--text-2)' }}>
-          <span className="code-pill" style={{ marginTop: 1 }}>{hab.rotulo || habSel}</span>
+          <span className="code-pill" style={{ marginTop: 1 }}>{hab.rotulo || habAtivo}</span>
           <MatrizBadge matriz={hab.matriz} />
           <span style={{ flex: 1 }}>{hab.desc}</span>
         </div>
@@ -306,7 +359,7 @@ export const VerificacaoContinua = ({ openAluno }) => {
       <div className="grid" style={{ gridTemplateColumns: 'repeat(2,1fr)', gap: 12 }}>
         {alunos.map(a => {
           const cur = marks[a.id];
-          const prev = avaliacoes[a.id] && avaliacoes[a.id][habSel];
+          const prev = avaliacoes[a.id] && avaliacoes[a.id][habAtivo];
           const last = prev && prev.length ? prev[prev.length - 1].resultado : null;
           return (
             <div key={a.id} className="card" style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12,
@@ -336,7 +389,7 @@ export const VerificacaoContinua = ({ openAluno }) => {
         <div style={{ fontSize: 13, color: 'var(--text-2)' }}>
           {erro ? <span style={{ color: 'var(--red)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 7 }}><I name="info" size={17} />{erro}</span>
             : saved ? <span style={{ color: 'var(--green)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 7 }}><I name="check2" size={17} />Avaliação registrada em {data} · contador atualizado</span>
-            : <>Registrando <b>{hab.rotulo || habSel}</b> · {data} · {marcados} de {alunos.length} alunos marcados</>}
+            : <>Registrando <b>{hab.rotulo || habAtivo}</b> · {data} · {marcados} de {alunos.length} alunos marcados</>}
         </div>
         <button className="btn btn-primary" disabled={marcados === 0 || salvando} style={{ opacity: marcados === 0 || salvando ? .5 : 1 }} onClick={registrar}>
           <I name="check" size={16} />{salvando ? 'Registrando…' : 'Registrar avaliação'}
