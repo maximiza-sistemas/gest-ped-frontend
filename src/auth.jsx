@@ -55,16 +55,8 @@ export const Login = ({ onLogin }) => {
           <p style={{ color: '#aab8cf', fontSize: 15, marginTop: 18, lineHeight: 1.6 }}>
             Acompanhe o desenvolvimento das habilidades de cada aluno com decisões baseadas em dados.
           </p>
-          <div style={{ display: 'flex', gap: 26, marginTop: 34 }}>
-            {[['6', 'escolas na rede'], ['4', 'matrizes de referência'], ['4', 'perfis de acesso']].map((s, i) => (
-              <div key={i}>
-                <div className="num" style={{ fontSize: 26, fontWeight: 800 }}>{s[0]}</div>
-                <div style={{ fontSize: 12, color: '#8fa3c0' }}>{s[1]}</div>
-              </div>
-            ))}
-          </div>
         </div>
-        <div style={{ position: 'relative', fontSize: 12, color: '#6f82a0' }}>São José de Ribamar - MA · Ano letivo 2026</div>
+        <div />
       </div>
 
       {/* Lado direito — acesso (rola quando o conteúdo passa da altura da viewport) */}
