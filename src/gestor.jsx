@@ -34,7 +34,7 @@ export const GestorDashboard = ({ go }) => {
         </>}
       />
 
-      <div className="grid" style={{ gridTemplateColumns: 'repeat(4,1fr)', marginBottom: 18 }}>
+      <div className="grid grid-cols-4" style={{ marginBottom: 18 }}>
         <Stat label="Planejamentos ativos" value={D.PLANEJAMENTOS.filter(p => p.status === 'ativo').length} sub="1º Bimestre · 2 turmas" icon="plan" accent="#2563eb" />
         <Stat label="Habilidades direcionadas" value={D.PLANEJAMENTOS.reduce((s, p) => s + p.habilidades.length, 0)} sub="4 matrizes de referência" icon="skills" accent="#6d4bd1" />
         <Stat label="Habilidades trabalhadas" value="54%" delta={12} sub="entre as iniciadas" icon="target" accent="#15935f" />
@@ -67,7 +67,7 @@ export const GestorDashboard = ({ go }) => {
         </div>
       </div>
 
-      <div className="grid" style={{ gridTemplateColumns: '1fr 1fr', marginBottom: 18 }}>
+      <div className="grid grid-cols-2" style={{ marginBottom: 18 }}>
         {/* Aderência ao planejamento */}
         <div className="card card-pad">
           <h3 style={{ fontSize: 15, marginBottom: 4 }}>Aderência ao planejamento</h3>
@@ -111,7 +111,7 @@ export const GestorDashboard = ({ go }) => {
           </div>
           <button className="btn btn-subtle btn-sm" onClick={() => go('habilidades')}>Ver catálogo<I name="chevR" size={14} /></button>
         </div>
-        <div className="grid" style={{ gridTemplateColumns: 'repeat(4,1fr)' }}>
+        <div className="grid grid-cols-4">
           {D.MATRIZES.map(m => {
             const vinc = D.PLANEJAMENTOS.reduce((s, p) => s + p.habilidades.filter(c => (D.habByCod[c] || {}).matriz === m.id).length, 0);
             const tot = D.HABILIDADES.filter(h => h.matriz === m.id).length;
@@ -139,9 +139,27 @@ export const Planejamentos = ({ go, openPlan, periodoInicial }) => {
   const [novo, setNovo] = useState(false);
   const [editar, setEditar] = useState(null);
   const [periodoSel, setPeriodoSel] = useState(periodoInicial || 'todos');
+  const [escolaSel, setEscolaSel] = useState('todas');
+  const [anoSel, setAnoSel] = useState('todos');
   const podeCriar = ['admin', 'secretaria'].includes(D.CURRENT_USER?.perfil);
-  const mesesComPlano = D.PERIODOS.filter(p => D.PLANEJAMENTOS.some(pl => pl.periodo === p.id));
-  const lista = D.PLANEJAMENTOS.filter(pl => periodoSel === 'todos' || pl.periodo === periodoSel);
+
+  // filtros relacionados: a escola casa com o planejamento via grupo (grupo null = toda a rede)
+  const grupoDaEscola = Object.fromEntries(D.ESCOLAS.map(e => [e.id, e.grupoId || null]));
+  const casaMes = (pl, mes) => mes === 'todos' || pl.periodo === mes;
+  const casaEscola = (pl, esc) => esc === 'todas' || !(pl.grupos || []).length || pl.grupos.some(g => g.id === grupoDaEscola[esc]);
+  const casaAno = (pl, ano) => ano === 'todos' || !(pl.anos || []).length || pl.anos.includes(ano);
+
+  // as opções de cada filtro consideram a seleção dos outros dois
+  const mesesDisp = D.PERIODOS.filter(p => D.PLANEJAMENTOS.some(pl => pl.periodo === p.id && casaEscola(pl, escolaSel) && casaAno(pl, anoSel)));
+  const escolasDisp = D.ESCOLAS.filter(e => D.PLANEJAMENTOS.some(pl => casaMes(pl, periodoSel) && casaEscola(pl, e.id) && casaAno(pl, anoSel)));
+  const anosDisp = D.ANOS.filter(a => D.PLANEJAMENTOS.some(pl => casaMes(pl, periodoSel) && casaEscola(pl, escolaSel) && casaAno(pl, a.ordem)));
+  // a opção selecionada continua visível mesmo quando os outros filtros a excluem
+  const mesesOpts = periodoSel !== 'todos' && !mesesDisp.some(p => p.id === periodoSel) ? [...mesesDisp, D.PERIODOS.find(p => p.id === periodoSel)].filter(Boolean) : mesesDisp;
+  const escolasOpts = escolaSel !== 'todas' && !escolasDisp.some(e => e.id === escolaSel) ? [...escolasDisp, D.ESCOLAS.find(e => e.id === escolaSel)].filter(Boolean) : escolasDisp;
+  const anosOpts = anoSel !== 'todos' && !anosDisp.some(a => a.ordem === anoSel) ? [...anosDisp, D.ANOS.find(a => a.ordem === anoSel)].filter(Boolean) : anosDisp;
+
+  const filtroAtivo = periodoSel !== 'todos' || escolaSel !== 'todas' || anoSel !== 'todos';
+  const lista = D.PLANEJAMENTOS.filter(pl => casaMes(pl, periodoSel) && casaEscola(pl, escolaSel) && casaAno(pl, anoSel));
   const anosTxt = pl => pl.anos && pl.anos.length ? pl.anos.map(a => D.anoNome(a)).join(', ') : 'Todas as séries';
   const statusBadge = s => s === 'ativo' ? ['badge-green', 'Ativo'] : s === 'arquivado' ? ['badge-gray', 'Arquivado'] : ['badge-blue', 'Concluído'];
   const excluir = async pl => {
@@ -161,13 +179,26 @@ export const Planejamentos = ({ go, openPlan, periodoInicial }) => {
 
       {D.PLANEJAMENTOS.length > 0 && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
-          <select className="input" style={{ maxWidth: 220 }} value={periodoSel} onChange={e => setPeriodoSel(e.target.value)}>
+          <select className="input" style={{ maxWidth: 200 }} value={periodoSel} onChange={e => setPeriodoSel(e.target.value)}>
             <option value="todos">Todos os meses</option>
-            {mesesComPlano.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
+            {mesesOpts.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
+          </select>
+          <select className="input" style={{ maxWidth: 250 }} value={escolaSel} onChange={e => setEscolaSel(e.target.value)}>
+            <option value="todas">Todas as escolas</option>
+            {escolasOpts.map(esc => <option key={esc.id} value={esc.id}>{esc.nome}</option>)}
+          </select>
+          <select className="input" style={{ maxWidth: 170 }} value={anoSel} onChange={e => setAnoSel(e.target.value === 'todos' ? 'todos' : Number(e.target.value))}>
+            <option value="todos">Todos os anos</option>
+            {anosOpts.map(a => <option key={a.ordem} value={a.ordem}>{a.nome}</option>)}
           </select>
           <span style={{ fontSize: 12.5, color: 'var(--text-3)' }}>
-            {lista.length} planejamento{lista.length === 1 ? '' : 's'}{periodoSel !== 'todos' ? ' · ' + D.periodoNome(periodoSel) : ''}
+            {lista.length} planejamento{lista.length === 1 ? '' : 's'}
           </span>
+          {filtroAtivo && (
+            <button className="btn btn-ghost btn-sm" onClick={() => { setPeriodoSel('todos'); setEscolaSel('todas'); setAnoSel('todos'); }}>
+              <I name="x" size={13} />Limpar filtros
+            </button>
+          )}
         </div>
       )}
 
@@ -178,7 +209,7 @@ export const Planejamentos = ({ go, openPlan, periodoInicial }) => {
           <p style={{ fontSize: 13.5, maxWidth: 420, margin: '0 auto' }}>Quando a Secretaria de Educação publicar planejamentos, eles aparecerão aqui.</p>
         </div>
       ) : (
-        <div className="grid" style={{ gridTemplateColumns: 'repeat(3,1fr)' }}>
+        <div className="grid grid-cols-3">
           {lista.map(pl => {
             const [scls, slbl] = statusBadge(pl.status);
             return (
@@ -186,7 +217,7 @@ export const Planejamentos = ({ go, openPlan, periodoInicial }) => {
                 onClick={() => openPlan(pl.id)}
                 onMouseEnter={e => { e.currentTarget.style.boxShadow = 'var(--shadow)'; e.currentTarget.style.transform = 'translateY(-2px)'; }}
                 onMouseLeave={e => { e.currentTarget.style.boxShadow = 'var(--shadow-sm)'; e.currentTarget.style.transform = 'none'; }}>
-                <div style={{ height: 5, background: pl.grupoCor || 'var(--primary)' }} />
+                <div style={{ height: 5, background: (pl.grupos && pl.grupos[0] && pl.grupos[0].cor) || 'var(--primary)' }} />
                 <div className="card-pad">
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12, gap: 10 }}>
                     <span className="chip"><I name="calendar" size={13} />{D.periodoNome(pl.periodo)}</span>
@@ -205,7 +236,7 @@ export const Planejamentos = ({ go, openPlan, periodoInicial }) => {
                     display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{pl.objetivo}</p>}
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
                     <span className="chip"><I name="grad" size={13} />{anosTxt(pl)}</span>
-                    {pl.grupoNome && <span className="chip"><I name="layers" size={13} />{pl.grupoNome}</span>}
+                    <span className="chip"><I name="layers" size={13} />{(pl.grupos && pl.grupos.length) ? pl.grupos.map(g => g.nome).join(', ') : 'Toda a rede'}</span>
                     <span className="chip"><I name="skills" size={13} />{pl.habilidades.length} habilidades</span>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 9, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
@@ -223,7 +254,7 @@ export const Planejamentos = ({ go, openPlan, periodoInicial }) => {
 
           {lista.length === 0 && (
             <div className="card card-pad" style={{ color: 'var(--text-3)', fontSize: 13.5, gridColumn: '1 / -1' }}>
-              Nenhum planejamento{periodoSel !== 'todos' ? ' em ' + D.periodoNome(periodoSel) : ''}.
+              Nenhum planejamento{filtroAtivo ? ' com os filtros selecionados' : ''}.
             </div>
           )}
 

@@ -47,13 +47,10 @@ export const FichaAluno = ({ alunoId, back }) => {
             <span className="chip"><I name="users" size={13} />1º Ano A · Matutino</span>
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 10 }}>
-          <button className="btn btn-ghost"><I name="download" size={15} />Relatório do aluno</button>
-        </div>
       </div>
 
       {/* stats */}
-      <div className="grid" style={{ gridTemplateColumns: 'repeat(4,1fr)', marginBottom: 18 }}>
+      <div className="grid grid-cols-4" style={{ marginBottom: 18 }}>
         <Stat label="Habilidades avaliadas" value={habs.length} icon="skills" accent="#2563eb" />
         <Stat label="Total de avaliações" value={todas.length} icon="check" accent="#0e8aa8" />
         <Stat label="Atingiu o esperado" value={pctAtingiu + '%'} sub={`${atingiu} de ${todas.length}`} icon="target" accent="#15935f" />
@@ -68,7 +65,7 @@ export const FichaAluno = ({ alunoId, back }) => {
       </div>
 
       {tab === 'desempenho' && (
-        <div className="grid fade-in" style={{ gridTemplateColumns: 'repeat(2,1fr)' }}>
+        <div className="grid fade-in grid-cols-2">
           {habs.map(h => {
             const avs = avalAluno[h] || [];
             const last = avs[avs.length - 1];

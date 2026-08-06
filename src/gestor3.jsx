@@ -79,7 +79,7 @@ export const Periodos = ({ irParaPlanejamentos }) => {
   return (
     <div className="fade-in">
       <PageHeader title="Períodos avaliativos" subtitle="Períodos avaliativos do ano letivo. Clique em um mês para ver os planejamentos direcionados nele." />
-      <div className="grid" style={{ gridTemplateColumns: 'repeat(4,1fr)' }}>
+      <div className="grid grid-cols-4">
         {D.PERIODOS.map(p => {
           const n = D.PLANEJAMENTOS.filter(pl => pl.periodo === p.id).length;
           return (

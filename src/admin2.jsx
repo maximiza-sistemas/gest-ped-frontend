@@ -4,7 +4,7 @@
    ============================================================ */
 import React, { useState, useEffect } from 'react';
 import { DATA, fetchTurmaFull, fetchAlunoFull, fetchAvaliacoesAluno, adminCriarUsuario, adminEditarUsuario, adminExcluirUsuario, adminConfig, adminSalvarConfig,
-  adminCriarTurma, adminEditarTurma, adminExcluirTurma, adminCriarAluno, adminEditarAluno, adminExcluirAluno, adminEditarEscola } from './store.js';
+  adminCriarTurma, adminEditarTurma, adminExcluirTurma, adminCriarAluno, adminEditarAluno, adminExcluirAluno, adminEditarEscola, fetchTurmas, fetchAlunos } from './store.js';
 import { PageHeader, Stat, I, Avatar, Modal } from './ui.jsx';
 import { ZonaBadge, fmt, EscolaForm } from './admin.jsx';
 
@@ -39,7 +39,7 @@ export const AdminEscolaDetail = ({ escolaId, back, openTurma }) => {
         <button className="btn btn-ghost" onClick={() => setEditando(true)}><I name="edit" size={15} />Editar escola</button>
       </div>
 
-      <div className="grid" style={{ gridTemplateColumns: 'repeat(3,1fr)', marginBottom: 18 }}>
+      <div className="grid grid-cols-3" style={{ marginBottom: 18 }}>
         <Stat label="Turmas" value={e.totTurmas} icon="grid" accent={e.cor} />
         <Stat label="Alunos" value={e.totAlunos} icon="users" accent="#6d4bd1" />
         <Stat label="Professores" value={e.professores} icon="grad" accent="#0e8aa8" />
@@ -100,7 +100,7 @@ const TurmaForm = ({ titulo, inicial, onSave, onClose }) => {
             {(D.ESCOLAS || []).map(e => <option key={e.id} value={e.id}>{e.nome}</option>)}
           </select>
         </div>
-        <div className="grid" style={{ gridTemplateColumns: '1.4fr 1fr', gap: 14 }}>
+        <div className="grid grid-main-aside" style={{ gap: 14 }}>
           <div>
             <label className="field-label">Nome da turma</label>
             <input className="input" value={f.nome} onChange={e => set('nome', e.target.value)} placeholder="Ex.: 1º Ano A" />
@@ -279,26 +279,46 @@ const AlunoForm = ({ titulo, inicial, turmas, editando, onSave, onClose }) => {
   );
 };
 
-/* -------- Diretório de alunos -------- */
+/* -------- Diretório de alunos (paginação no servidor) -------- */
+const ALUNOS_POR_PAGINA = 50;
+
 export const AdminAlunos = ({ openAluno }) => {
   const D = DATA;
   const escolas = D.escolasFull();
   const [q, setQ] = useState('');
   const [escFilter, setEscFilter] = useState('todas');
+  const [pagina, setPagina] = useState(0);
+  const [dados, setDados] = useState(null); // { total, alunos } · null = carregando
   const [novo, setNovo] = useState(false);
   const [editar, setEditar] = useState(null);
   const turmasOpts = escolas.flatMap(e => e.turmas.map(t => ({ id: t.id, label: e.sigla + ' · ' + t.nome })));
-  let alunos = [];
-  escolas.forEach(e => { if (escFilter === 'todas' || escFilter === e.id) e.turmas.forEach(t => t.alunos.forEach(a => alunos.push({ ...a, escolaNome: e.nome, escolaCor: e.cor, sigla: e.sigla, turmaId: t.id, turmaNome: t.nome }))); });
-  if (q) alunos = alunos.filter(a => a.nome.toLowerCase().includes(q.toLowerCase()));
-  const total = alunos.length;
-  const shown = alunos.slice(0, 50);
 
-  const criar = f => adminCriarAluno({ nome: f.nome.trim(), turma: f.turma });
-  const salvarEdicao = f => adminEditarAluno(editar.id, { nome: f.nome.trim(), turma: f.turma, numero: f.numero });
+  const carregar = () => fetchAlunos({
+    busca: q.trim() || undefined,
+    escola: escFilter !== 'todas' ? escFilter : undefined,
+    limit: ALUNOS_POR_PAGINA,
+    offset: pagina * ALUNOS_POR_PAGINA,
+  }).then(setDados).catch(() => setDados({ total: 0, alunos: [] }));
+
+  // busca com debounce; troca de filtro/página recarrega direto
+  useEffect(() => {
+    setDados(null);
+    const t = setTimeout(carregar, q ? 300 : 0);
+    return () => clearTimeout(t);
+  }, [q, escFilter, pagina]);
+  useEffect(() => { setPagina(0); }, [q, escFilter]);
+
+  const total = dados ? dados.total : 0;
+  const alunos = dados ? dados.alunos : [];
+  const totalPaginas = Math.max(1, Math.ceil(total / ALUNOS_POR_PAGINA));
+  const ini = total === 0 ? 0 : pagina * ALUNOS_POR_PAGINA + 1;
+  const fim = Math.min(total, pagina * ALUNOS_POR_PAGINA + alunos.length);
+
+  const criar = async f => { await adminCriarAluno({ nome: f.nome.trim(), turma: f.turma }); carregar(); };
+  const salvarEdicao = async f => { await adminEditarAluno(editar.id, { nome: f.nome.trim(), turma: f.turma, numero: f.numero }); carregar(); };
   const excluir = async a => {
     if (!window.confirm(`Excluir o aluno "${a.nome}"? Os registros de avaliação e leitura dele serão removidos.`)) return;
-    try { await adminExcluirAluno(a.id); } catch (err) { alert(err.message); }
+    try { await adminExcluirAluno(a.id); carregar(); } catch (err) { alert(err.message); }
   };
 
   return (
@@ -317,17 +337,20 @@ export const AdminAlunos = ({ openAluno }) => {
       </div>
       <div className="card">
         <div style={{ padding: '10px 16px', borderBottom: '1px solid var(--border)', fontSize: 12.5, color: 'var(--text-3)' }}>
-          {fmt(total)} alunos encontrados {total > 50 && <>· exibindo os primeiros 50</>}
+          {dados === null ? 'Carregando…' : <>Mostrando <b className="num">{fmt(ini)}–{fmt(fim)}</b> de <b className="num">{fmt(total)}</b> alunos</>}
         </div>
         <table className="tbl">
           <thead><tr><th>Aluno</th><th>Escola</th><th>Turma</th><th style={{ width: 90 }}></th></tr></thead>
           <tbody>
-            {shown.map(a => (
-              <tr key={a.id} className="clickable" onClick={() => openAluno(a.id)}>
+            {dados !== null && alunos.length === 0 && (
+              <tr><td colSpan={4} style={{ color: 'var(--text-3)', padding: '18px 16px' }}>Nenhum aluno encontrado.</td></tr>
+            )}
+            {alunos.map(a => (
+              <tr key={a.id}>
                 <td><div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><Avatar nome={a.nome} iniciais={a.iniciais} cor="#64748b" size={30} /><span style={{ fontWeight: 600 }}>{a.nome}</span></div></td>
                 <td>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <div style={{ width: 24, height: 24, borderRadius: 6, background: a.escolaCor + '18', color: a.escolaCor, display: 'grid', placeItems: 'center', fontWeight: 700, fontSize: 9, flex: 'none' }}>{a.sigla}</div>
+                    <div style={{ width: 24, height: 24, borderRadius: 6, background: a.escolaCor + '18', color: a.escolaCor, display: 'grid', placeItems: 'center', fontWeight: 700, fontSize: 9, flex: 'none' }}>{a.escolaSigla}</div>
                     <span style={{ color: 'var(--text-2)', fontSize: 13 }}>{a.escolaNome}</span>
                   </div>
                 </td>
@@ -340,11 +363,23 @@ export const AdminAlunos = ({ openAluno }) => {
             ))}
           </tbody>
         </table>
+        {/* barra de paginação */}
+        <div style={{ padding: '10px 16px', borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 12.5, color: 'var(--text-3)' }}>
+            Página <b className="num">{fmt(pagina + 1)}</b> de <b className="num">{fmt(totalPaginas)}</b>
+          </span>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button className="btn btn-subtle btn-sm" disabled={pagina === 0} style={{ opacity: pagina === 0 ? .5 : 1 }} onClick={() => setPagina(0)}>« Primeira</button>
+            <button className="btn btn-subtle btn-sm" disabled={pagina === 0} style={{ opacity: pagina === 0 ? .5 : 1 }} onClick={() => setPagina(p => Math.max(0, p - 1))}><I name="chevL" size={14} />Anterior</button>
+            <button className="btn btn-subtle btn-sm" disabled={pagina + 1 >= totalPaginas} style={{ opacity: pagina + 1 >= totalPaginas ? .5 : 1 }} onClick={() => setPagina(p => p + 1)}>Próxima<I name="chevR" size={14} /></button>
+            <button className="btn btn-subtle btn-sm" disabled={pagina + 1 >= totalPaginas} style={{ opacity: pagina + 1 >= totalPaginas ? .5 : 1 }} onClick={() => setPagina(totalPaginas - 1)}>Última »</button>
+          </div>
+        </div>
       </div>
       {novo && <AlunoForm titulo="Novo aluno" turmas={turmasOpts} onClose={() => setNovo(false)} onSave={criar}
         inicial={{ nome: '', turma: '' }} />}
       {editar && <AlunoForm titulo={'Editar — ' + editar.nome} editando turmas={turmasOpts} onClose={() => setEditar(null)} onSave={salvarEdicao}
-        inicial={{ nome: editar.nome, turma: editar.turmaId, numero: editar.numero }} />}
+        inicial={{ nome: editar.nome, turma: editar.turma, numero: editar.numero }} />}
     </div>
   );
 };
@@ -371,7 +406,6 @@ export const AdminAlunoFicha = ({ alunoId, back }) => {
             <span className="chip"><I name="grid" size={13} />{a.turmaNome} · {a.turno}</span>
           </div>
         </div>
-        <button className="btn btn-ghost"><I name="download" size={15} />Relatório</button>
       </div>
 
       <div className="card card-pad" style={{ color: 'var(--text-3)', fontSize: 13 }}>
@@ -388,6 +422,22 @@ const UserForm = ({ titulo, inicial, onSave, onClose, editando }) => {
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState(null);
   const set = (k, v) => setF(x => ({ ...x, [k]: v }));
+
+  // vínculo do professor: turmas de toda a rede + escola em foco no seletor
+  const [turmasRede, setTurmasRede] = useState(DATA.TURMAS);
+  const [escolaProf, setEscolaProf] = useState((D.ESCOLAS[0] || {}).id || '');
+  useEffect(() => {
+    let ativo = true;
+    fetchTurmas().then(ts => {
+      if (!ativo) return;
+      setTurmasRede(ts);
+      const t0 = ts.find(t => (inicial.turmaIds || []).includes(t.id));
+      if (t0) setEscolaProf(t0.escola);
+    }).catch(() => {});
+    return () => { ativo = false; };
+  }, []);
+  const toggleTurma = tid => set('turmaIds',
+    (f.turmaIds || []).includes(tid) ? f.turmaIds.filter(x => x !== tid) : [...(f.turmaIds || []), tid]);
 
   const salvar = async () => {
     setSalvando(true);
@@ -419,7 +469,7 @@ const UserForm = ({ titulo, inicial, onSave, onClose, editando }) => {
           <label className="field-label">Nome completo</label>
           <input className="input" value={f.nome} onChange={e => set('nome', e.target.value)} placeholder="Ex.: Maria da Silva" />
         </div>
-        <div className="grid" style={{ gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+        <div className="grid grid-cols-2" style={{ gap: 14 }}>
           <div>
             <label className="field-label">E-mail</label>
             <input className="input" value={f.email} onChange={e => set('email', e.target.value)} placeholder="email@rededeensino.edu.br" />
@@ -443,17 +493,56 @@ const UserForm = ({ titulo, inicial, onSave, onClose, editando }) => {
           </div>
         </div>
         {f.perfil === 'professor' && (
-          <div>
-            <label className="field-label">Professor vinculado</label>
-            <select className="input" value={f.profId || ''} onChange={e => set('profId', e.target.value || null)}>
-              <option value="">— sem vínculo —</option>
-              {D.PROFESSORES.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
-            </select>
-          </div>
+          <>
+            <div className="grid grid-cols-2" style={{ gap: 14 }}>
+              <div>
+                <label className="field-label">Professor vinculado</label>
+                <select className="input" value={f.profId || ''} onChange={e => {
+                  const pid = e.target.value || null;
+                  const prof = D.PROFESSORES.find(x => x.id === pid);
+                  setF(x => ({ ...x, profId: pid, ...(prof ? { comp: prof.comp, turmaIds: prof.turmaIds || [] } : {}) }));
+                }}>
+                  <option value="">— novo professor —</option>
+                  {D.PROFESSORES.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="field-label">Componente curricular</label>
+                <select className="input" value={f.comp || (D.COMPONENTES[0] || {}).id || ''} onChange={e => set('comp', e.target.value)}>
+                  {D.COMPONENTES.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
+                </select>
+              </div>
+            </div>
+            <div>
+              <label className="field-label">Escola</label>
+              <select className="input" value={escolaProf} onChange={e => setEscolaProf(e.target.value)}>
+                {(D.ESCOLAS || []).map(e2 => <option key={e2.id} value={e2.id}>{e2.nome}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="field-label">Turmas do professor <span style={{ color: 'var(--text-4)', fontWeight: 400 }}>({(f.turmaIds || []).length} selecionada(s))</span></label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 7, maxHeight: 180, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 10, padding: 8 }}>
+                {turmasRede.filter(t => t.escola === escolaProf).map(t => {
+                  const on = (f.turmaIds || []).includes(t.id);
+                  return (
+                    <label key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 9px', borderRadius: 8, cursor: 'pointer',
+                      background: on ? 'var(--primary-50)' : 'transparent' }}>
+                      <input type="checkbox" checked={on} onChange={() => toggleTurma(t.id)} />
+                      <span style={{ fontWeight: 600, fontSize: 13 }}>{t.nome}</span>
+                      {t.turno && <span className="badge badge-gray" style={{ marginLeft: 'auto' }}>{t.turno}</span>}
+                    </label>
+                  );
+                })}
+                {turmasRede.filter(t => t.escola === escolaProf).length === 0 && (
+                  <span style={{ fontSize: 12.5, color: 'var(--text-3)' }}>Nenhuma turma nesta escola.</span>
+                )}
+              </div>
+            </div>
+          </>
         )}
         {f.perfil === 'gestor' && (
           <div>
-            <label className="field-label">Escolas do gestor <span style={{ color: 'var(--text-4)', fontWeight: 400 }}>(grupo de escolas que ele coordena)</span></label>
+            <label className="field-label">Escolas do gestor <span style={{ color: 'var(--text-4)', fontWeight: 400 }}>(acesso automático a todas as turmas dessas escolas)</span></label>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 7, maxHeight: 180, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 10, padding: 8 }}>
               {(D.ESCOLAS || []).map(e => {
                 const on = (f.escolaIds || []).includes(e.id);
@@ -488,15 +577,21 @@ export const AdminUsers = () => {
   const [novo, setNovo] = useState(false);
   const [editar, setEditar] = useState(null);
 
+  const vinculoProf = f => f.perfil === 'professor'
+    ? { ...(f.comp ? { comp: f.comp } : {}), turmaIds: f.turmaIds || [] }
+    : {};
   const criar = f => adminCriarUsuario({
     nome: f.nome, email: f.email, senha: f.senha, perfil: f.perfil,
     cargo: f.cargo, profId: f.profId || null, escolaIds: f.escolaIds || [],
+    ...vinculoProf(f),
   });
   const salvarEdicao = f => adminEditarUsuario(editar.id, {
     nome: f.nome, email: f.email, perfil: f.perfil, cargo: f.cargo,
     ativo: f.ativo, profId: f.profId || null, escolaIds: f.escolaIds || [],
     ...(f.senha ? { senha: f.senha } : {}),
+    ...vinculoProf(f),
   });
+  const profDe = id => D.PROFESSORES.find(x => x.id === id) || {};
   const excluir = async u => {
     if (!window.confirm(`Excluir o usuário ${u.nome}?`)) return;
     try { await adminExcluirUsuario(u.id); } catch (err) { alert(err.message); }
@@ -506,7 +601,7 @@ export const AdminUsers = () => {
     <div className="fade-in">
       <PageHeader title="Usuários & acessos" subtitle="Contas da rede com quatro perfis: Secretaria de Educação, gestor escolar/coordenador, professor e administrador."
         actions={<button className="btn btn-primary" onClick={() => setNovo(true)}><I name="plus" size={15} />Novo usuário</button>} />
-      <div className="grid" style={{ gridTemplateColumns: 'repeat(4,1fr)', marginBottom: 18 }}>
+      <div className="grid grid-cols-4" style={{ marginBottom: 18 }}>
         <Stat label="Total de contas" value={users.length} icon="users" accent="#2563eb" />
         <Stat label="Secretaria" value={users.filter(u => u.perfil === 'secretaria').length} icon="layers" accent="#0e7490" />
         <Stat label="Gestores" value={users.filter(u => u.perfil === 'gestor').length} icon="grad" accent="#6d4bd1" />
@@ -534,11 +629,12 @@ export const AdminUsers = () => {
 
       {novo && (
         <UserForm titulo="Novo usuário" onClose={() => setNovo(false)} onSave={criar}
-          inicial={{ nome: '', email: '', senha: '', perfil: 'gestor', cargo: '', profId: null, escolaIds: [] }} />
+          inicial={{ nome: '', email: '', senha: '', perfil: 'gestor', cargo: '', profId: null, escolaIds: [], comp: null, turmaIds: [] }} />
       )}
       {editar && (
         <UserForm titulo={'Editar — ' + editar.nome} editando onClose={() => setEditar(null)} onSave={salvarEdicao}
-          inicial={{ nome: editar.nome, email: editar.email, senha: '', perfil: editar.perfil, cargo: editar.cargo, profId: editar.profId || null, escolaIds: editar.escolaIds || [], ativo: editar.ativo !== false }} />
+          inicial={{ nome: editar.nome, email: editar.email, senha: '', perfil: editar.perfil, cargo: editar.cargo, profId: editar.profId || null, escolaIds: editar.escolaIds || [], ativo: editar.ativo !== false,
+            comp: profDe(editar.profId).comp || null, turmaIds: profDe(editar.profId).turmaIds || [] }} />
       )}
     </div>
   );
@@ -601,7 +697,7 @@ export const AdminConfig = () => {
       </div>
     </div>
 
-    <div className="grid" style={{ gridTemplateColumns: '1fr 1fr', marginBottom: 22 }}>
+    <div className="grid grid-cols-2" style={{ marginBottom: 22 }}>
       {[
         ['Componentes curriculares', 'Língua Portuguesa, Matemática', 'skills'],
         ['Períodos avaliativos', 'Bimestral · 4 períodos', 'calendar'],

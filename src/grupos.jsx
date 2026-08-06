@@ -186,7 +186,7 @@ export const GruposEscolas = () => {
         actions={<button className="btn btn-primary" onClick={() => setNovo(true)}><I name="plus" size={16} />Novo grupo</button>}
       />
 
-      <div className="grid" style={{ gridTemplateColumns: 'repeat(3,1fr)', marginBottom: 18 }}>
+      <div className="grid grid-cols-3" style={{ marginBottom: 18 }}>
         <Stat label="Grupos" value={grupos.length} icon="layers" accent="#2563eb" />
         <Stat label="Escolas agrupadas" value={agrupadas} icon="school" accent="#15935f" />
         <Stat label="Sem grupo" value={semGrupo.length} icon="school" accent="#c77a07" />

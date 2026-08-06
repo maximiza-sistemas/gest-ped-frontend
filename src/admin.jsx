@@ -30,7 +30,7 @@ export const EscolaForm = ({ titulo, inicial, onSave, onClose }) => {
   return (
     <Modal title={titulo} icon="school" width={500} onClose={onClose} footer={foot}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-        <div className="grid" style={{ gridTemplateColumns: '2fr 1fr', gap: 14 }}>
+        <div className="grid grid-2-1" style={{ gap: 14 }}>
           <div>
             <label className="field-label">Nome da escola</label>
             <input className="input" value={f.nome} onChange={e => set('nome', e.target.value)} placeholder="Ex.: EMEF Anísio Teixeira" />
@@ -40,7 +40,7 @@ export const EscolaForm = ({ titulo, inicial, onSave, onClose }) => {
             <input className="input" value={f.sigla} onChange={e => set('sigla', e.target.value.toUpperCase())} placeholder="EAT" maxLength={4} />
           </div>
         </div>
-        <div className="grid" style={{ gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+        <div className="grid grid-cols-2" style={{ gap: 14 }}>
           <div>
             <label className="field-label">Zona</label>
             <select className="input" value={f.zona} onChange={e => set('zona', e.target.value)}>
@@ -114,7 +114,7 @@ export const AdminRedeDashboard = ({ openEscola }) => {
         </>}
       />
 
-      <div className="grid" style={{ gridTemplateColumns: 'repeat(4,1fr)', marginBottom: 18 }}>
+      <div className="grid grid-cols-4" style={{ marginBottom: 18 }}>
         <Stat label="Escolas" value={r.escolas} sub={`${urbanas.length} urbanas · ${rurais.length} rurais`} icon="school" accent="#2563eb" />
         <Stat label="Alunos matriculados" value={fmt(r.alunos)} sub="anos iniciais" icon="users" accent="#6d4bd1" />
         <Stat label="Turmas" value={r.turmas} sub="na rede" icon="grid" accent="#0e8aa8" />
@@ -134,7 +134,7 @@ export const AdminRedeDashboard = ({ openEscola }) => {
         {porMatriz.length === 0 ? (
           <div style={{ color: 'var(--text-3)', fontSize: 13 }}>Nenhuma habilidade direcionada no momento.</div>
         ) : (
-          <div className="grid" style={{ gridTemplateColumns: 'repeat(2,1fr)', gap: 16 }}>
+          <div className="grid grid-cols-2" style={{ gap: 16 }}>
             {porMatriz.map(m => (
               <div key={m.id}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 7 }}>
@@ -184,7 +184,7 @@ export const AdminRedeDashboard = ({ openEscola }) => {
       </div>
 
       {/* Resumo por zona */}
-      <div className="grid" style={{ gridTemplateColumns: '1fr 1fr' }}>
+      <div className="grid grid-cols-2">
         {[['Urbana', urbanas], ['Rural', rurais]].map(([z, arr]) => (
           <div key={z} className="card card-pad">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -215,7 +215,7 @@ export const AdminEscolas = ({ openEscola }) => {
     <div className="fade-in">
       <PageHeader title="Escolas" subtitle="Unidades escolares da rede municipal. Selecione uma escola para ver turmas, alunos e indicadores."
         actions={<button className="btn btn-primary" onClick={() => setNovo(true)}><I name="plus" size={15} />Nova escola</button>} />
-      <div className="grid" style={{ gridTemplateColumns: 'repeat(3,1fr)' }}>
+      <div className="grid grid-cols-3">
         {escolas.map(e => (
           <div key={e.id} className="card card-pad" onClick={() => openEscola(e.id)} style={{ textAlign: 'left', display: 'flex', flexDirection: 'column', gap: 14, cursor: 'pointer', transition: 'box-shadow .15s, transform .15s' }}
             onMouseEnter={ev => { ev.currentTarget.style.boxShadow = 'var(--shadow)'; ev.currentTarget.style.transform = 'translateY(-2px)'; }}

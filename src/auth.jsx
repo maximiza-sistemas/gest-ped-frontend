@@ -17,6 +17,7 @@ export const Login = ({ onLogin }) => {
   const [perfil, setPerfil] = useState('secretaria');
   const [email, setEmail] = useState(PERFIS[0].email);
   const [senha, setSenha] = useState('demo123');
+  const [lembrar, setLembrar] = useState(true); // sessão longa: acesso direto na volta
   const [erro, setErro] = useState(null);
   const [carregando, setCarregando] = useState(false);
 
@@ -27,7 +28,7 @@ export const Login = ({ onLogin }) => {
     setErro(null);
     setCarregando(true);
     try {
-      const user = await login(email.trim(), senha);
+      const user = await login(email.trim(), senha, lembrar);
       onLogin(user);
     } catch (err) {
       setErro(err.message);
@@ -36,9 +37,9 @@ export const Login = ({ onLogin }) => {
   };
 
   return (
-    <div style={{ height: '100%', display: 'grid', gridTemplateColumns: '1fr 1fr' }}>
+    <div className="login-split">
       {/* Lado esquerdo — marca */}
-      <div style={{ background: 'linear-gradient(160deg, #101066, #06062c 65%)', color: '#fff', padding: '56px 60px',
+      <div className="login-brand" style={{ background: 'linear-gradient(160deg, #101066, #06062c 65%)', color: '#fff', padding: '56px 60px',
         display: 'flex', flexDirection: 'column', justifyContent: 'space-between', position: 'relative', overflow: 'hidden' }}>
         <div style={{ position: 'absolute', width: 460, height: 460, borderRadius: '50%', background: 'radial-gradient(circle, rgba(5,161,227,.32), transparent 70%)', top: -120, right: -120 }} />
         <div style={{ position: 'relative' }}>
@@ -63,7 +64,7 @@ export const Login = ({ onLogin }) => {
             ))}
           </div>
         </div>
-        <div style={{ position: 'relative', fontSize: 12, color: '#6f82a0' }}>EMEF Anísio Teixeira · Ano letivo 2026</div>
+        <div style={{ position: 'relative', fontSize: 12, color: '#6f82a0' }}>São José de Ribamar - MA · Ano letivo 2026</div>
       </div>
 
       {/* Lado direito — acesso (rola quando o conteúdo passa da altura da viewport) */}
@@ -98,7 +99,12 @@ export const Login = ({ onLogin }) => {
           <input className="input" value={email} onChange={e => setEmail(e.target.value)} autoComplete="username" style={{ marginBottom: 14 }} />
           <label className="field-label">Senha</label>
           <input className="input" type="password" value={senha} onChange={e => setSenha(e.target.value)} autoComplete="current-password" style={{ marginBottom: 8 }} />
-          <div style={{ textAlign: 'right', marginBottom: 18 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginBottom: 18 }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12.5, color: 'var(--text-2)', fontWeight: 600, cursor: 'pointer' }}>
+              <input type="checkbox" checked={lembrar} onChange={e => setLembrar(e.target.checked)}
+                style={{ width: 15, height: 15, accentColor: 'var(--primary)' }} />
+              Manter conectado
+            </label>
             <a href="#" onClick={e => e.preventDefault()} style={{ fontSize: 12.5, color: 'var(--primary)', textDecoration: 'none', fontWeight: 600 }}>Esqueci minha senha</a>
           </div>
 

@@ -12,8 +12,8 @@ export const subscribe = fn => { listeners.add(fn); return () => listeners.delet
 export const notify = () => listeners.forEach(fn => fn());
 
 /* ---------------- sessão ---------------- */
-export async function login(email, senha) {
-  const { token, user } = await api.post('/auth/login', { email, senha });
+export async function login(email, senha, lembrar = true) {
+  const { token, user } = await api.post('/auth/login', { email, senha, lembrar });
   setToken(token);
   DATA.CURRENT_USER = user;
   await hydrateForUser(user);
@@ -69,26 +69,33 @@ export async function hydrateMeta() {
   });
 }
 
-/** Escola padrão (e1): turmas, alunos da 1A, planejamentos + trabalho, avaliações, timeline */
+/** Contexto padrão: turma representativa dinâmica — a 1ª turma do professor
+    logado, ou a 1ª turma disponível (antes era fixo em e1/t1 do seed). */
 export async function hydrateEscolaAtual() {
-  const [turmas, t1, planejamentos, avaliacoes, timeline] = await Promise.all([
-    api.get('/turmas?escola=e1'),
-    api.get('/turmas/t1/full'),
+  const [turmas, planejamentos, timeline] = await Promise.all([
+    api.get('/turmas'),
     api.get('/planejamentos'),
-    api.get('/avaliacoes/turma/t1'),
     api.get('/timeline?limit=30'),
   ]);
+  const prof = DATA.CURRENT_USER?.profId
+    ? (DATA.PROFESSORES || []).find(p => p.id === DATA.CURRENT_USER.profId)
+    : null;
+  const turmaRep = (prof?.turmaIds || []).map(id => turmas.find(t => t.id === id)).filter(Boolean)[0]
+    || turmas[0] || null;
+  const [full, avaliacoes] = turmaRep
+    ? await Promise.all([api.get('/turmas/' + turmaRep.id + '/full'), api.get('/avaliacoes/turma/' + turmaRep.id)])
+    : [{ alunos: [] }, {}];
 
   DATA.TURMAS = turmas;
-  DATA.ALUNOS = t1.alunos;
-  DATA.alunosT1 = t1.alunos;
-  DATA.TURMA_ATUAL = t1;
-  DATA.ESCOLA_ATUAL = ['e1'];
+  DATA.ALUNOS = full.alunos;
+  DATA.alunosT1 = full.alunos;
+  DATA.TURMA_ATUAL = turmaRep ? full : null;
+  DATA.ESCOLA_ATUAL = turmaRep ? [turmaRep.escola] : [];
   DATA.PLANEJAMENTOS = planejamentos;
   DATA.TIMELINE = timeline;
 
   DATA.AVALIACOES = avaliacoes;
-  t1.alunos.forEach(a => { if (!DATA.AVALIACOES[a.id]) DATA.AVALIACOES[a.id] = {}; });
+  full.alunos.forEach(a => { if (!DATA.AVALIACOES[a.id]) DATA.AVALIACOES[a.id] = {}; });
 
   // trabalho + semanas de cada planejamento (mantém PlanDetail/painéis síncronos)
   const detalhes = await Promise.all(planejamentos.map(pl => api.get('/planejamentos/' + pl.id)));
@@ -129,6 +136,20 @@ export async function hydrateGestor(user) {
   DATA.SEMANAS = Object.fromEntries(detalhes.map(d => [d.id, d.semanas || []]));
 }
 
+/** Turmas no escopo do usuário (secretaria/admin = rede toda; gestor = grupo) */
+export async function fetchTurmas() {
+  return api.get('/turmas');
+}
+
+/** Diretório de alunos paginado: { escola?, turma?, busca?, limit?, offset? } → { total, alunos } */
+export async function fetchAlunos(params = {}) {
+  const qs = Object.entries(params)
+    .filter(([, v]) => v !== undefined && v !== null && v !== '')
+    .map(([k, v]) => `${k}=${encodeURIComponent(v)}`)
+    .join('&');
+  return api.get('/alunos' + (qs ? '?' + qs : ''));
+}
+
 export async function hydratePlano(id) {
   const d = await api.get('/planejamentos/' + id);
   DATA.TRABALHO[id] = d.trabalho;
@@ -156,19 +177,35 @@ export async function hydrateRede() {
 /** Verificação contínua em lote: { planejamentoId, habCod, data, marks } */
 export async function registrarAvaliacaoLote(payload) {
   await api.post('/avaliacoes/lote', payload);
-  const turmaId = payload.turmaId || (DATA.TURMA_ATUAL && DATA.TURMA_ATUAL.id) || 't1';
+  const turmaId = payload.turmaId || (DATA.TURMA_ATUAL && DATA.TURMA_ATUAL.id);
   const [avaliacoes] = await Promise.all([
     api.get('/avaliacoes/turma/' + turmaId),
     hydratePlano(payload.planejamentoId),
   ]);
   // mantém o global em sincronia quando a turma avaliada é a representativa
-  if (turmaId === ((DATA.TURMA_ATUAL && DATA.TURMA_ATUAL.id) || 't1')) {
+  if (turmaId === (DATA.TURMA_ATUAL && DATA.TURMA_ATUAL.id)) {
     DATA.AVALIACOES = avaliacoes;
     (DATA.alunosT1 || []).forEach(a => { if (!DATA.AVALIACOES[a.id]) DATA.AVALIACOES[a.id] = {}; });
   }
   DATA.TIMELINE = await api.get('/timeline?limit=30');
   notify();
   return avaliacoes; // a tela usa para atualizar a turma selecionada
+}
+
+/** Exclui uma verificação (sessão turma + habilidade + data); devolve as avaliações atualizadas da turma */
+export async function excluirVerificacao({ habCod, turmaId, data, planejamentoId }) {
+  await api.delete(`/avaliacoes/sessao?hab=${encodeURIComponent(habCod)}&turma=${encodeURIComponent(turmaId)}&data=${encodeURIComponent(data)}`);
+  const [avaliacoes] = await Promise.all([
+    api.get('/avaliacoes/turma/' + turmaId),
+    planejamentoId ? hydratePlano(planejamentoId) : Promise.resolve(),
+  ]);
+  if (turmaId === (DATA.TURMA_ATUAL && DATA.TURMA_ATUAL.id)) {
+    DATA.AVALIACOES = avaliacoes;
+    (DATA.alunosT1 || []).forEach(a => { if (!DATA.AVALIACOES[a.id]) DATA.AVALIACOES[a.id] = {}; });
+  }
+  DATA.TIMELINE = await api.get('/timeline?limit=30');
+  notify();
+  return avaliacoes;
 }
 
 /** Atividades/recursos/status de uma habilidade do planejamento */
@@ -182,7 +219,7 @@ export async function salvarTrabalho(planejamentoId, habCod, payload) {
 export async function criarPlanejamento(form) {
   const plano = await api.post('/planejamentos', {
     titulo: form.titulo, objetivo: form.objetivo, periodo: form.periodo,
-    anos: form.anos || [], grupo: form.grupo || null,
+    anos: form.anos || [], grupos: form.grupos || [],
     habilidades: form.habs,
   });
   DATA.PLANEJAMENTOS = [...DATA.PLANEJAMENTOS, plano];
@@ -221,6 +258,41 @@ export async function salvarSemanas(planejamentoId, semanas) {
   DATA.SEMANAS[planejamentoId] = [...outras, ...saved];
   notify();
   return saved;
+}
+
+/* ---------------- habilidades (catálogo — gestor/secretaria/admin) ---------------- */
+
+/** Nova habilidade no catálogo: { cod, rotulo?, matriz, comp, desc } */
+export async function criarHabilidade(payload) {
+  const h = await api.post('/habilidades', payload);
+  DATA.HABILIDADES = [...DATA.HABILIDADES, h];
+  DATA.habByCod = { ...DATA.habByCod, [h.cod]: h };
+  notify();
+  return h;
+}
+
+/* ---------------- componentes curriculares (admin/secretaria) ---------------- */
+
+/** Novo componente curricular: { id, nome } */
+export async function criarComponente(payload) {
+  const c = await api.post('/componentes', payload);
+  DATA.COMPONENTES = [...DATA.COMPONENTES, c];
+  notify();
+  return c;
+}
+
+/** Renomear componente curricular: { nome } */
+export async function atualizarComponente(id, payload) {
+  const c = await api.patch('/componentes/' + id, payload);
+  DATA.COMPONENTES = DATA.COMPONENTES.map(x => x.id === id ? c : x);
+  notify();
+  return c;
+}
+
+export async function excluirComponente(id) {
+  await api.delete('/componentes/' + id);
+  DATA.COMPONENTES = DATA.COMPONENTES.filter(x => x.id !== id);
+  notify();
 }
 
 /* ---------------- grupos de escolas (admin/secretaria) ---------------- */
@@ -262,6 +334,7 @@ export async function moverEscola(escolaId, grupoId) {
 export async function adminCriarUsuario(payload) {
   const u = await api.post('/admin/usuarios', payload);
   DATA.USUARIOS = [...DATA.USUARIOS, u];
+  if (u.perfil === 'professor') await hydrateMeta(); // vínculo Professor novo/alterado entra no catálogo
   notify();
   return u;
 }
@@ -269,6 +342,7 @@ export async function adminCriarUsuario(payload) {
 export async function adminEditarUsuario(id, payload) {
   const u = await api.patch('/admin/usuarios/' + id, payload);
   DATA.USUARIOS = DATA.USUARIOS.map(x => x.id === id ? u : x);
+  if (u.perfil === 'professor') await hydrateMeta();
   notify();
   return u;
 }

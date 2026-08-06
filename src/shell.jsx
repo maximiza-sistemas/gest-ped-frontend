@@ -35,11 +35,13 @@ const NAV = {
     ]},
     { grupo: 'Planejamento', itens: [
       { id: 'planejamentos', label: 'Planejamentos', icon: 'plan', badge: '3' },
-      { id: 'habilidades', label: 'Matrizes & habilidades', icon: 'skills' },
     ]},
     { grupo: 'Acompanhamento', itens: [
       { id: 'professores', label: 'Professores & turmas', icon: 'users' },
       { id: 'periodos', label: 'Períodos', icon: 'calendar' },
+    ]},
+    { grupo: 'Sistema', itens: [
+      { id: 'sag', label: 'SAG', icon: 'external' },
     ]},
   ],
   professor: [
@@ -52,24 +54,30 @@ const NAV = {
       { id: 'alunos', label: 'Meus alunos', icon: 'users' },
       { id: 'planoprof', label: 'Meu planejamento', icon: 'plan' },
     ]},
+    { grupo: 'Sistema', itens: [
+      { id: 'sag', label: 'SAG', icon: 'external' },
+    ]},
   ],
   admin: [
     { grupo: 'Rede', itens: [
       { id: 'admrede', label: 'Visão da rede', icon: 'dashboard' },
-      { id: 'admescolas', label: 'Escolas', icon: 'school', badge: '6' },
       { id: 'admgrupos', label: 'Grupos de escolas', icon: 'layers' },
+      { id: 'cadastro', label: 'Cadastro', icon: 'folder', children: [
+        { id: 'admescolas', label: 'Escolas', icon: 'school', badge: '6' },
+        { id: 'admanos', label: 'Anos escolares', icon: 'grad' },
+        { id: 'admcomponentes', label: 'Componentes curriculares', icon: 'book' },
+        { id: 'admturmas', label: 'Turmas', icon: 'grid' },
+        { id: 'admalunos', label: 'Alunos', icon: 'users' },
+      ]},
     ]},
     { grupo: 'Pedagógico', itens: [
       { id: 'planejamentos', label: 'Planejamentos', icon: 'plan' },
-    ]},
-    { grupo: 'Cadastros', itens: [
-      { id: 'admanos', label: 'Anos escolares', icon: 'grad' },
-      { id: 'admturmas', label: 'Turmas', icon: 'grid' },
-      { id: 'admalunos', label: 'Alunos', icon: 'users' },
+      { id: 'habilidades', label: 'Matrizes & habilidades', icon: 'skills' },
     ]},
     { grupo: 'Sistema', itens: [
       { id: 'admusers', label: 'Usuários & acessos', icon: 'user' },
       { id: 'admconfig', label: 'Configurações', icon: 'settings' },
+      { id: 'sag', label: 'SAG', icon: 'external' },
     ]},
   ],
 };
@@ -91,17 +99,42 @@ const TITLES = {
   admescolas: ['Escolas', 'Unidades escolares da rede municipal'],
   admgrupos: ['Grupos de escolas', 'Organize as escolas da rede em grupos (polos)'],
   admanos: ['Anos escolares', 'Séries usadas para direcionar os planejamentos'],
+  admcomponentes: ['Componentes curriculares', 'Disciplinas usadas nas habilidades, professores e planejamentos'],
   admturmas: ['Turmas', 'Todas as turmas da rede, por escola e ano'],
   admalunos: ['Alunos', 'Diretório de estudantes da rede'],
   admusers: ['Usuários & acessos', 'Gestão de contas e permissões'],
   admconfig: ['Configurações', 'Parâmetros gerais do sistema'],
+  sag: ['SAG', 'Aplicação integrada da maXXimiza'],
 };
 
-export const Sidebar = ({ user, route, setRoute, onLogout }) => {
+// item de menu expansível (ex.: Cadastro) — abre sozinho quando a rota ativa é de um submenu
+const NavGrupo = ({ item, route, setRoute, onClose }) => {
+  const filhoAtivo = item.children.some(c => c.id === route);
+  const [override, setOverride] = useState(null); // null = segue a rota ativa
+  const aberto = override ?? filhoAtivo;
+  return (
+    <>
+      <button className={'nav-item' + (filhoAtivo && !aberto ? ' active' : '')} onClick={() => setOverride(!aberto)}>
+        <I name={item.icon} size={18} />
+        {item.label}
+        <span className={'nav-chev' + (aberto ? ' open' : '')}><I name="chevD" size={15} /></span>
+      </button>
+      {aberto && item.children.map(c => (
+        <button key={c.id} className={'nav-item sub' + (route === c.id ? ' active' : '')} onClick={() => { setRoute(c.id); onClose?.(); }}>
+          <I name={c.icon} size={16} />
+          {c.label}
+          {c.badge && <span className="nav-badge num">{c.badge}</span>}
+        </button>
+      ))}
+    </>
+  );
+};
+
+export const Sidebar = ({ user, route, setRoute, onLogout, open, onClose }) => {
   const D = DATA;
   const nav = NAV[user.perfil] || [];
   return (
-    <aside className="sidebar">
+    <aside className={'sidebar' + (open ? ' open' : '')}>
       <div className="brand" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 9 }}>
         <div className="brand-logo"><img src="/assets/logo-maximiza.png" alt="maXXimiza — Soluções Educacionais" /></div>
         <span style={{ fontSize: 11.5, color: '#8da0bf', paddingLeft: 3, display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -112,8 +145,10 @@ export const Sidebar = ({ user, route, setRoute, onLogout }) => {
         {nav.map((g, gi) => (
           <div key={gi}>
             <div className="nav-group-label">{g.grupo}</div>
-            {g.itens.map(it => (
-              <button key={it.id} className={'nav-item' + (route === it.id ? ' active' : '')} onClick={() => setRoute(it.id)}>
+            {g.itens.map(it => it.children ? (
+              <NavGrupo key={it.id} item={it} route={route} setRoute={setRoute} onClose={onClose} />
+            ) : (
+              <button key={it.id} className={'nav-item' + (route === it.id ? ' active' : '')} onClick={() => { setRoute(it.id); onClose?.(); }}>
                 <I name={it.icon} size={18} />
                 {it.label}
                 {it.badge && <span className="nav-badge num">{it.badge}</span>}
@@ -138,14 +173,17 @@ export const Sidebar = ({ user, route, setRoute, onLogout }) => {
   );
 };
 
-export const Topbar = ({ route, user, onSwitch, periodo, setPeriodo }) => {
+export const Topbar = ({ route, user, onSwitch, periodo, setPeriodo, onMenu }) => {
   const D = DATA;
   const [t, sub] = TITLES[route] || ['', ''];
   const [openP, setOpenP] = useState(false);
   return (
     <header className="topbar">
-      <div style={{ flex: 1 }}>
-        <h1>{t}</h1>
+      <button className="menu-toggle" title="Menu" onClick={onMenu}>
+        <I name="menu" size={20} />
+      </button>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <h1 style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t}</h1>
       </div>
       {/* Seletor de período */}
       <div style={{ position: 'relative' }}>
@@ -205,7 +243,7 @@ const SwitchProfile = ({ user, onSwitch }) => {
     <>
       <button className="btn btn-subtle btn-sm" onClick={() => setOpen(o => !o)} style={{ paddingLeft: 6 }}>
         <Avatar nome={user.nome} iniciais={user.iniciais} cor={user.cor} size={26} />
-        <span style={{ maxWidth: 110, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.nome.split(' ')[0]}</span>
+        <span className="profile-name" style={{ maxWidth: 110, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.nome.split(' ')[0]}</span>
         <I name="chevD" size={14} />
       </button>
       {open && (

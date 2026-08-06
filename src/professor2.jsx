@@ -1,10 +1,10 @@
 /* ============================================================
    Professor (parte 2) — Meus alunos, Meu planejamento
    ============================================================ */
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { DATA, salvarSemanas } from './store.js';
 import { PageHeader, I, Avatar } from './ui.jsx';
-import { meuPlano } from './professor.jsx';
+import { planosDirecionados } from './professor.jsx';
 
 /* -------- Meus alunos -------- */
 export const MeusAlunos = ({ openAluno }) => {
@@ -18,7 +18,7 @@ export const MeusAlunos = ({ openAluno }) => {
         <I name="search" size={16} style={{ position: 'absolute', left: 12, top: 11, color: 'var(--text-3)' }} />
         <input className="input" placeholder="Buscar aluno…" value={q} onChange={e => setQ(e.target.value)} style={{ paddingLeft: 36 }} />
       </div>
-      <div className="grid" style={{ gridTemplateColumns: 'repeat(3,1fr)' }}>
+      <div className="grid grid-cols-3">
         {list.map(a => {
           const avals = ['EF01LP01', 'EF01LP02', 'EF01LP04', 'EF01LP07'].reduce((s, h) => s + D.avalCount(a.id, h), 0);
           return (
@@ -63,19 +63,45 @@ const AcompanhamentoBadge = ({ t }) => {
   return <span className="badge" style={{ background: 'var(--red-bg)', color: 'var(--red)' }}>{txt}</span>;
 };
 
+const SEMANA_VAZIA = () => ({ habilidades: [], sequenciaDidatica: '', recursosDidaticos: '', verificacaoAprendizagem: '', referencias: '' });
+
 export const MeuPlanejamento = () => {
   const D = DATA;
-  const pl = meuPlano();
   const profId = D.CURRENT_USER?.profId;
-  const [semanas, setSemanas] = useState(() => {
-    const minhas = (D.SEMANAS[pl?.id] || []).filter(s => s.prof === profId).slice().sort((a, b) => a.semana - b.semana);
+
+  // meses e planos direcionados a este professor — mesma regra do painel e da
+  // verificação contínua (componente + escola via grupos + série das turmas)
+  const meses = D.PERIODOS.filter(p => planosDirecionados(p.id).length > 0);
+  const mesAtual = (D.PERIODOS.find(p => p.atual) || {}).id;
+  const [mesSel, setMesSel] = useState(meses.some(m => m.id === mesAtual) ? mesAtual : (meses[0] ? meses[0].id : null));
+  const planosMes = planosDirecionados(mesSel);
+  const [planoSelId, setPlanoSelId] = useState(null); // null = primeiro plano do mês
+  const pl = planosMes.find(p => p.id === planoSelId) || planosMes[0] || null;
+
+  // semanas do professor no plano do mês selecionado
+  const semanasDe = planoId => {
+    const minhas = (D.SEMANAS[planoId] || []).filter(s => s.prof === profId).slice().sort((a, b) => a.semana - b.semana);
     return minhas.length
       ? minhas.map(s => ({ habilidades: s.habilidades || [], sequenciaDidatica: s.sequenciaDidatica, recursosDidaticos: s.recursosDidaticos, verificacaoAprendizagem: s.verificacaoAprendizagem, referencias: s.referencias }))
-      : [{ habilidades: [], sequenciaDidatica: '', recursosDidaticos: '', verificacaoAprendizagem: '', referencias: '' }];
-  });
+      : [SEMANA_VAZIA()];
+  };
+  const [semanas, setSemanas] = useState(() => semanasDe(pl?.id));
   const [salvando, setSalvando] = useState(false);
   const [saved, setSaved] = useState(false);
   const [erro, setErro] = useState(null);
+
+  // ao trocar o mês, volta ao primeiro plano do mês
+  useEffect(() => { setPlanoSelId(null); }, [mesSel]);
+
+  // ao trocar de plano/mês, recarrega o editor NO MESMO render (sem frame com
+  // conteúdo do plano anterior): semanas já iniciadas aparecem; senão, em branco
+  const [planoCarregado, setPlanoCarregado] = useState(pl?.id);
+  if (pl?.id !== planoCarregado) {
+    setPlanoCarregado(pl?.id);
+    setSemanas(semanasDe(pl?.id));
+    setSaved(false);
+    setErro(null);
+  }
 
   if (!pl) return (
     <div className="fade-in">
@@ -117,7 +143,24 @@ export const MeuPlanejamento = () => {
 
   return (
     <div className="fade-in">
-      <PageHeader title="Meu planejamento" subtitle="Organize a sequência didática semana a semana. As habilidades, a expectativa de aprendizagem e o mês são definidos pela Secretaria e não podem ser alterados." />
+      <PageHeader title="Meu planejamento" subtitle="Organize a sequência didática semana a semana. As habilidades, a expectativa de aprendizagem e o mês são definidos pela Secretaria e não podem ser alterados."
+        actions={meses.length > 0 && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <I name="calendar" size={15} style={{ color: 'var(--text-3)' }} />
+            <select className="input" value={mesSel || ''} onChange={e => setMesSel(e.target.value)} style={{ height: 38, width: 180 }}>
+              {meses.map(m => <option key={m.id} value={m.id}>{m.nome}{m.id === mesAtual ? ' (mês atual)' : ''}</option>)}
+            </select>
+          </div>
+        )} />
+
+      {/* mês com mais de um planejamento direcionado: escolha qual preencher */}
+      {planosMes.length > 1 && (
+        <div className="seg" style={{ marginBottom: 14, flexWrap: 'wrap' }}>
+          {planosMes.map(p => (
+            <button key={p.id} className={pl && pl.id === p.id ? 'active' : ''} onClick={() => setPlanoSelId(p.id)}>{p.titulo}</button>
+          ))}
+        </div>
+      )}
 
       {/* cabeçalho direcionado (somente leitura) */}
       <div className="card card-pad" style={{ marginBottom: 18 }}>
@@ -132,7 +175,7 @@ export const MeuPlanejamento = () => {
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 14 }}>
           <span className="chip"><I name="calendar" size={13} />{D.periodoNome(pl.periodo)}</span>
           <span className="chip"><I name="grad" size={13} />{anosTxt}</span>
-          {pl.grupoNome && <span className="chip"><I name="layers" size={13} />{pl.grupoNome}</span>}
+          <span className="chip"><I name="layers" size={13} />{(pl.grupos && pl.grupos.length) ? pl.grupos.map(g => g.nome).join(', ') : 'Toda a rede'}</span>
         </div>
         <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
           <div className="section-title">Habilidades a trabalhar</div>

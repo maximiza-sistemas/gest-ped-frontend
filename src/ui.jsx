@@ -49,6 +49,9 @@ export const ICONS = {
   grad: ['M22 10 12 5 2 10l10 5 10-5z', 'M6 12v5c0 1 2 3 6 3s6-2 6-3v-5'],
   school: ['M3 21h18', 'M5 21V8l7-4 7 4v13', 'M9 21v-6h6v6'],
   swap: ['M16 3l4 4-4 4', 'M20 7H4', 'M8 21l-4-4 4-4', 'M4 17h16'],
+  menu: 'M3 6h18M3 12h18M3 18h18',
+  folder: 'M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z',
+  external: ['M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6', 'M15 3h6v6', 'M10 14 21 3'],
 };
 export const I = ({ name, ...rest }) => <Icon d={ICONS[name]} fill={['dashboard'].includes(name)} {...rest} />;
 

@@ -2,18 +2,30 @@
    Módulo Professor — Meu painel + Verificação contínua
    ============================================================ */
 import React, { useState, useEffect } from 'react';
-import { DATA, registrarAvaliacaoLote, fetchTurmaFull, fetchAvaliacoesTurma } from './store.js';
+import { DATA, registrarAvaliacaoLote, fetchTurmaFull, fetchAvaliacoesTurma, excluirVerificacao } from './store.js';
 import { PageHeader, Stat, I, MatrizBadge, Bar, Avatar, ICONS } from './ui.jsx';
 
 // ícone lock extra (registrado no catálogo compartilhado de ícones)
 ICONS.lock = ['M19 11H5a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2z', 'M7 11V7a5 5 0 0 1 10 0v4'];
 
-// planejamento direcionado para o mês corrente (a secretaria direciona por mês,
-// não mais por professor). Fallback: primeiro ativo / primeiro da lista.
-export const meuPlano = () => {
-  const mes = (DATA.PERIODOS.find(p => p.atual) || {}).id;
-  const ativos = DATA.PLANEJAMENTOS.filter(p => p.status === 'ativo');
-  return ativos.find(p => p.periodo === mes) || ativos[0] || DATA.PLANEJAMENTOS[0] || null;
+// Planos ativos direcionados AO PROFESSOR LOGADO (opcionalmente de um mês):
+// casam pelo componente curricular e pela escola (grupos do plano × grupo da
+// escola das turmas do professor). Campo vazio no plano = vale para todos.
+// A(s) série(s) do plano são informativas (exibidas nos chips) e não
+// restringem o professor. Regra única usada no painel, na verificação
+// contínua e no Meu planejamento.
+export const planosDirecionados = mes => {
+  const D = DATA;
+  const prof = D.PROFESSORES.find(p => p.id === D.CURRENT_USER?.profId);
+  const comp = prof ? prof.comp : null;
+  const doComp = c => !comp || (D.habByCod[c] || {}).comp === comp;
+  const turmas = (prof?.turmaIds || []).map(id => (D.TURMAS || []).find(t => t.id === id)).filter(Boolean);
+  const temTurmas = turmas.length > 0;
+  const meusGrupos = new Set(turmas.map(t => ((D.ESCOLAS || []).find(e => e.id === t.escola) || {}).grupoId).filter(Boolean));
+  return D.PLANEJAMENTOS.filter(pl => pl.status === 'ativo'
+    && (mes ? pl.periodo === mes : true)
+    && pl.habilidades.some(doComp)
+    && (!temTurmas || !(pl.grupos || []).length || pl.grupos.some(g => meusGrupos.has(g.id))));
 };
 
 /* -------- Meu painel -------- */
@@ -23,8 +35,7 @@ export const ProfessorPainel = ({ go }) => {
   const prof = D.PROFESSORES.find(p => p.id === D.CURRENT_USER?.profId);
   const profComp = prof ? prof.comp : null;
   const doComp = c => !profComp || (D.habByCod[c] || {}).comp === profComp;
-  const ativos = D.PLANEJAMENTOS.filter(p => p.status === 'ativo');
-  const meses = D.PERIODOS.filter(p => ativos.some(a => a.periodo === p.id && a.habilidades.some(doComp))); // meses com direcionamento p/ o professor
+  const meses = D.PERIODOS.filter(p => planosDirecionados(p.id).length > 0); // meses com direcionamento p/ o professor
   const mesAtual = (D.PERIODOS.find(p => p.atual) || {}).id;
   const [mesSel, setMesSel] = useState(meses.some(m => m.id === mesAtual) ? mesAtual : (meses[0] ? meses[0].id : null));
 
@@ -40,7 +51,7 @@ export const ProfessorPainel = ({ go }) => {
   );
 
   // habilidades do componente do professor, agregadas dos planejamentos do mês (cada uma com seu trabalho)
-  const planosMes = ativos.filter(p => p.periodo === mesSel && p.habilidades.some(doComp));
+  const planosMes = planosDirecionados(mesSel);
   const habs = planosMes.flatMap(pl => pl.habilidades.filter(doComp).map(c => {
     const t = (D.TRABALHO[pl.id] || {})[c] || { status: 'pendente', avaliacoes: 0 };
     return { cod: c, planoId: pl.id, ...D.habByCod[c], ...t };
@@ -68,14 +79,14 @@ export const ProfessorPainel = ({ go }) => {
         </>}
       />
 
-      <div className="grid" style={{ gridTemplateColumns: 'repeat(4,1fr)', marginBottom: 18 }}>
+      <div className="grid grid-cols-4" style={{ marginBottom: 18 }}>
         <Stat label="Habilidades direcionadas" value={habs.length} sub={`${planosMes.length} planejamento${planosMes.length === 1 ? '' : 's'} · ${D.periodoNome(mesSel)}`} icon="skills" accent="#2563eb" />
         <Stat label="Trabalhadas" value={trabalhadas} sub={`${Math.round(trabalhadas / total * 100)}% do planejamento`} icon="check2" accent="#15935f" />
         <Stat label="Pendentes" value={pendentes} sub="ainda não iniciadas" icon="flag" accent="#c77a07" />
         <Stat label="Avaliações realizadas" value={totAval} sub={D.periodoNome(mesSel)} icon="check" accent="#0e8aa8" />
       </div>
 
-      <div className="grid" style={{ gridTemplateColumns: '1fr 320px' }}>
+      <div className="grid grid-side-320">
         {/* habilidades */}
         <div className="card">
           <div className="card-pad" style={{ borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
@@ -163,9 +174,8 @@ export const VerificacaoContinua = ({ openAluno }) => {
   // professor logado e seu componente — só vê habilidades do seu componente
   const prof = D.PROFESSORES.find(p => p.id === D.CURRENT_USER?.profId);
   const profComp = prof ? prof.comp : null;
-  const ativos = D.PLANEJAMENTOS.filter(p => p.status === 'ativo');
   // habilidades direcionadas em um mês, do componente do professor (com plano de origem)
-  const habsDoMes = mes => ativos.filter(p => p.periodo === mes)
+  const habsDoMes = mes => planosDirecionados(mes)
     .flatMap(p => p.habilidades.map(c => ({ cod: c, planoId: p.id })))
     .filter(h => !profComp || (D.habByCod[h.cod] || {}).comp === profComp);
   const meses = D.PERIODOS.filter(p => habsDoMes(p.id).length > 0); // só meses com direcionamento para o professor
@@ -240,6 +250,52 @@ export const VerificacaoContinua = ({ openAluno }) => {
 
   const dist = [0, 0];
   Object.values(marks).forEach(v => dist[v - 1]++);
+
+  // verificações já registradas (sessões habilidade + data) do mês, na turma selecionada
+  const sessoes = (() => {
+    const byKey = {};
+    alunos.forEach(a => {
+      habCods.forEach(c => {
+        ((avaliacoes[a.id] || {})[c] || []).forEach(r => {
+          const k = c + '|' + r.data;
+          const s = (byKey[k] ||= { habCod: c, data: r.data, avaliados: 0, atingiram: 0 });
+          s.avaliados++;
+          if (r.resultado === 2) s.atingiram++;
+        });
+      });
+    });
+    const ts = d => d.split('/').reverse().join(''); // dd/MM/yyyy → yyyyMMdd
+    return Object.values(byKey).sort((x, y) => ts(y.data).localeCompare(ts(x.data)) || x.habCod.localeCompare(y.habCod));
+  })();
+
+  // reabre uma verificação salva na grade (mesma data + habilidade → registrar substitui)
+  const editarSessao = s => {
+    setHabSel(s.habCod);
+    setData(s.data);
+    const m = {};
+    alunos.forEach(a => {
+      const arr = (avaliacoes[a.id] || {})[s.habCod] || [];
+      const reg = [...arr].reverse().find(r => r.data === s.data);
+      if (reg) m[a.id] = reg.resultado;
+    });
+    setMarks(m);
+    setSaved(false);
+    setErro(null);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const excluirSessao = async s => {
+    const h = D.habByCod[s.habCod] || {};
+    if (!window.confirm(`Excluir a verificação de ${h.rotulo || s.habCod} em ${s.data}?\n\nOs resultados de ${s.avaliados} aluno(s) nesta data serão removidos. Esta ação não pode ser desfeita.`)) return;
+    try {
+      const av = await excluirVerificacao({ habCod: s.habCod, turmaId: turmaSel, data: s.data, planejamentoId: planoDaHab[s.habCod] });
+      setAvaliacoes(av || {});
+      setMarks({});
+      setSaved(false);
+    } catch (err) {
+      alert(err.message);
+    }
+  };
 
   // acompanhamento das habilidades leitoras (matriz LEITORA) do mês, na turma selecionada
   const leitoras = habCods.filter(c => (D.habByCod[c] || {}).matriz === 'LEITORA').map(cod => {
@@ -356,7 +412,7 @@ export const VerificacaoContinua = ({ openAluno }) => {
       </div>
 
       {/* grade de alunos */}
-      <div className="grid" style={{ gridTemplateColumns: 'repeat(2,1fr)', gap: 12 }}>
+      <div className="grid grid-cols-2" style={{ gap: 12 }}>
         {alunos.map(a => {
           const cur = marks[a.id];
           const prev = avaliacoes[a.id] && avaliacoes[a.id][habAtivo];
@@ -394,6 +450,37 @@ export const VerificacaoContinua = ({ openAluno }) => {
         <button className="btn btn-primary" disabled={marcados === 0 || salvando} style={{ opacity: marcados === 0 || salvando ? .5 : 1 }} onClick={registrar}>
           <I name="check" size={16} />{salvando ? 'Registrando…' : 'Registrar avaliação'}
         </button>
+      </div>
+
+      {/* verificações registradas — editar reabre na grade; excluir remove a sessão */}
+      <div className="card" style={{ marginTop: 18 }}>
+        <div className="card-pad" style={{ borderBottom: sessoes.length ? '1px solid var(--border)' : 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+          <div>
+            <h3 style={{ fontSize: 15 }}>Verificações registradas</h3>
+            <p style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>{D.periodoNome(mesSel)} · {(turmasDisp.find(t => t.id === turmaSel) || {}).nome || ''}</p>
+          </div>
+          <span className="badge badge-blue num">{sessoes.length}</span>
+        </div>
+        {sessoes.length === 0 ? (
+          <div style={{ padding: '24px 22px', textAlign: 'center', color: 'var(--text-3)', fontSize: 13.5 }}>Nenhuma verificação registrada neste mês para esta turma.</div>
+        ) : sessoes.map(s => {
+          const h = D.habByCod[s.habCod] || {};
+          return (
+            <div key={s.habCod + s.data} style={{ padding: '13px 22px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+              <span style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 12.5, fontWeight: 600, color: 'var(--text-2)', width: 100, flex: 'none' }}>
+                <I name="calendar" size={14} />{s.data}
+              </span>
+              <span className="code-pill" style={{ flex: 'none' }}>{h.rotulo || s.habCod}</span>
+              <span style={{ flex: 1, minWidth: 140, fontSize: 12.5, color: 'var(--text-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{h.desc || ''}</span>
+              <span className="badge badge-gray num">{s.avaliados} aluno{s.avaliados === 1 ? '' : 's'}</span>
+              <span className="badge badge-green num">{s.atingiram} atingiram</span>
+              <div style={{ display: 'flex', gap: 2 }}>
+                <button className="icon-btn" title="Editar verificação" onClick={() => editarSessao(s)}><I name="edit" size={15} /></button>
+                <button className="icon-btn" title="Excluir verificação" onClick={() => excluirSessao(s)}><I name="x" size={15} /></button>
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

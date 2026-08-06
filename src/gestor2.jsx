@@ -2,8 +2,8 @@
    Gestor (parte 2) — Wizard de planejamento, detalhe,
    habilidades, níveis, professores, períodos
    ============================================================ */
-import React, { useState } from 'react';
-import { DATA, criarPlanejamento, atualizarPlanejamento, excluirPlanejamento } from './store.js';
+import React, { useState, useEffect } from 'react';
+import { DATA, criarPlanejamento, atualizarPlanejamento, excluirPlanejamento, hydratePlano, fetchTurmas, criarHabilidade } from './store.js';
 import { Modal, I, MatrizBadge, Avatar, PageHeader } from './ui.jsx';
 
 /* -------- Wizard: novo / editar planejamento -------- */
@@ -14,11 +14,11 @@ export const NovoPlanejamento = ({ onClose, plano }) => {
   const [form, setForm] = useState(() => editando ? {
     titulo: plano.titulo || '', objetivo: plano.objetivo || '',
     periodo: plano.periodo || (DATA.PERIODOS.find(p => p.atual) || DATA.PERIODOS[0] || {}).id || 'm01',
-    anos: plano.anos || [], grupo: plano.grupo || '', habs: plano.habilidades || [],
+    anos: plano.anos || [], grupos: (plano.grupos || []).map(g => g.id), habs: plano.habilidades || [],
   } : {
     titulo: '', objetivo: '',
     periodo: (DATA.PERIODOS.find(p => p.atual) || DATA.PERIODOS[0] || {}).id || 'm01',
-    anos: [], grupo: '', habs: [],
+    anos: [], grupos: [], habs: [],
   });
   const [matFilter, setMatFilter] = useState('todas');
   const [salvando, setSalvando] = useState(false);
@@ -28,6 +28,7 @@ export const NovoPlanejamento = ({ onClose, plano }) => {
   const grupos = (D.GRUPOS && D.GRUPOS.grupos) || [];
   const toggleHab = c => set('habs', form.habs.includes(c) ? form.habs.filter(x => x !== c) : [...form.habs, c]);
   const toggleAno = a => set('anos', form.anos.includes(a) ? form.anos.filter(x => x !== a) : [...form.anos, a]);
+  const toggleGrupo = id => set('grupos', form.grupos.includes(id) ? form.grupos.filter(x => x !== id) : [...form.grupos, id]);
   const steps = ['Mês e expectativa', 'Habilidades direcionadas'];
 
   const podeAvancar = step === 1 ? (form.titulo.trim().length >= 3 && !!form.periodo) : form.habs.length > 0;
@@ -38,7 +39,7 @@ export const NovoPlanejamento = ({ onClose, plano }) => {
     try {
       if (editando) await atualizarPlanejamento(plano.id, {
         titulo: form.titulo, objetivo: form.objetivo, periodo: form.periodo,
-        anos: form.anos || [], grupo: form.grupo || null, habilidades: form.habs,
+        anos: form.anos || [], grupos: form.grupos || [], habilidades: form.habs,
       });
       else await criarPlanejamento(form);
       onClose();
@@ -78,19 +79,28 @@ export const NovoPlanejamento = ({ onClose, plano }) => {
             <label className="field-label">Título do planejamento</label>
             <input className="input" placeholder="Ex.: Alfabetização — Leitura e escrita inicial" value={form.titulo} onChange={e => set('titulo', e.target.value)} />
           </div>
-          <div className="grid" style={{ gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-            <div>
-              <label className="field-label">Mês</label>
-              <select className="input" value={form.periodo} onChange={e => set('periodo', e.target.value)}>
-                {D.PERIODOS.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="field-label">Grupo que vai desenvolver</label>
-              <select className="input" value={form.grupo} onChange={e => set('grupo', e.target.value)}>
-                <option value="">Toda a rede</option>
-                {grupos.map(g => <option key={g.id} value={g.id}>{g.nome}</option>)}
-              </select>
+          <div>
+            <label className="field-label">Mês</label>
+            <select className="input" value={form.periodo} onChange={e => set('periodo', e.target.value)}>
+              {D.PERIODOS.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="field-label">Grupo(s) que vão desenvolver <span style={{ color: 'var(--text-4)', fontWeight: 400 }}>(vazio = toda a rede)</span></label>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {grupos.map(g => {
+                const on = form.grupos.includes(g.id);
+                return (
+                  <button key={g.id} type="button" onClick={() => toggleGrupo(g.id)}
+                    style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '8px 13px', borderRadius: 9, fontSize: 12.5, fontWeight: 700,
+                      border: '1.5px solid ' + (on ? 'var(--primary)' : 'var(--border-strong)'),
+                      background: on ? 'var(--primary)' : 'transparent', color: on ? '#fff' : 'var(--text-2)' }}>
+                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: on ? '#fff' : g.cor }} />
+                    {g.nome}
+                  </button>
+                );
+              })}
+              {grupos.length === 0 && <span style={{ fontSize: 12.5, color: 'var(--text-3)' }}>Nenhum grupo cadastrado — o planejamento vale para toda a rede.</span>}
             </div>
           </div>
           <div>
@@ -201,11 +211,85 @@ export const SemanaCard = ({ s }) => {
   );
 };
 
+/* -------- Sequências semanais: linha compacta por professor --------
+   Mostra professor, escola, componente e ano escolar; ao clicar lista
+   os meses em que o professor possui semanas cadastradas (em qualquer
+   planejamento) e cada mês abre um popup com as semanas planejadas. */
+const ProfSemanas = ({ profId, turmasRede }) => {
+  const D = DATA;
+  const p = D.prof(profId) || { nome: D.profNome(profId), iniciais: '?', cor: '#64748b', turmaIds: [] };
+  const turmas = (p.turmaIds || []).map(id => turmasRede.find(t => t.id === id)).filter(Boolean);
+  const escolas = [...new Set(turmas.map(t => D.escolaNome(t.escola)))].join(', ') || '—';
+  const anos = [...new Set(turmas.map(t => t.ano))].sort((a, b) => a - b).map(a => D.anoNome(a)).join(', ') || '—';
+  const [aberto, setAberto] = useState(false);
+  const [meses, setMeses] = useState(null);     // [{ periodo, semanas }] · null = ainda não carregado
+  const [mesPopup, setMesPopup] = useState(null);
+
+  const toggle = async () => {
+    if (aberto) { setAberto(false); return; }
+    setAberto(true);
+    if (!meses) {
+      // hidrata as semanas dos planejamentos que ainda não estão no store
+      await Promise.all(D.PLANEJAMENTOS
+        .filter(pl => pl.nSemanas > 0 && !D.SEMANAS[pl.id])
+        .map(pl => hydratePlano(pl.id).catch(() => {})));
+      const porMes = {};
+      for (const pl of D.PLANEJAMENTOS) {
+        const doProf = (D.SEMANAS[pl.id] || []).filter(s => s.prof === profId);
+        if (doProf.length) (porMes[pl.periodo] ||= []).push(...doProf);
+      }
+      setMeses(Object.entries(porMes).sort(([a], [b]) => a.localeCompare(b))
+        .map(([periodo, semanas]) => ({ periodo, semanas: semanas.slice().sort((x, y) => x.semana - y.semana) })));
+    }
+  };
+
+  return (
+    <div style={{ borderBottom: '1px solid var(--border)' }}>
+      <button onClick={toggle} style={{ display: 'flex', alignItems: 'center', gap: 14, width: '100%', padding: '14px 22px', textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer' }}>
+        <Avatar nome={p.nome} iniciais={p.iniciais} cor={p.cor} size={34} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontWeight: 700, fontSize: 13.5 }}>{p.nome}</div>
+          <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{escolas}</div>
+        </div>
+        <span className="chip"><I name="book" size={13} />{D.compNome(p.comp)}</span>
+        <span className="chip"><I name="grad" size={13} />{anos}</span>
+        <span className={'nav-chev' + (aberto ? ' open' : '')} style={{ color: 'var(--text-3)', marginLeft: 4 }}><I name="chevD" size={15} /></span>
+      </button>
+      {aberto && (
+        <div style={{ padding: '0 22px 16px 70px', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {!meses ? <span style={{ fontSize: 12.5, color: 'var(--text-3)' }}>Carregando meses…</span>
+            : meses.length === 0 ? <span style={{ fontSize: 12.5, color: 'var(--text-3)' }}>Nenhuma semana cadastrada.</span>
+            : meses.map(m => (
+              <button key={m.periodo} className="btn btn-subtle btn-sm" onClick={() => setMesPopup(m)}>
+                <I name="calendar" size={14} />{D.periodoNome(m.periodo)}
+                <span className="badge badge-blue num">{m.semanas.length} {m.semanas.length === 1 ? 'semana' : 'semanas'}</span>
+              </button>
+            ))}
+        </div>
+      )}
+      {mesPopup && (
+        <Modal title={`Semanas planejadas — ${D.periodoNome(mesPopup.periodo)}`} subtitle={`${p.nome} · ${escolas}`} icon="calendar" width={640} onClose={() => setMesPopup(null)}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {mesPopup.semanas.map(s => <SemanaCard key={s.id} s={s} />)}
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+};
+
 /* -------- Detalhe do planejamento -------- */
 export const PlanDetail = ({ planId, back }) => {
   const D = DATA;
   const [editando, setEditando] = useState(false);
   const [excluindo, setExcluindo] = useState(false);
+  // turmas da rede toda — resolve escola/ano dos professores (D.TURMAS só tem a escola padrão)
+  const [turmasRede, setTurmasRede] = useState(DATA.TURMAS);
+  useEffect(() => {
+    let ativo = true;
+    fetchTurmas().then(ts => { if (ativo) setTurmasRede(ts); }).catch(() => {});
+    return () => { ativo = false; };
+  }, []);
   const pl = D.PLANEJAMENTOS.find(p => p.id === planId);
   if (!pl) return <div className="card card-pad" style={{ color: 'var(--text-3)' }}>Planejamento não encontrado.</div>;
   const podeEditar = ['admin', 'secretaria'].includes(D.CURRENT_USER?.perfil);
@@ -219,7 +303,7 @@ export const PlanDetail = ({ planId, back }) => {
   const semanas = D.SEMANAS[pl.id] || [];
   const stMap = { trabalhada: ['badge-green', 'Trabalhada'], andamento: ['badge-amber', 'Em andamento'], pendente: ['badge-gray', 'Pendente'] };
   const anosTxt = pl.anos && pl.anos.length ? pl.anos.map(a => D.anoNome(a)).join(', ') : 'Todas as séries';
-  const grupoTxt = pl.grupoNome || 'Toda a rede';
+  const grupoTxt = (pl.grupos && pl.grupos.length) ? pl.grupos.map(g => g.nome).join(', ') : 'Toda a rede';
   const statusTxt = { ativo: 'Ativo', 'concluído': 'Concluído', arquivado: 'Arquivado' }[pl.status] || pl.status;
   const porProf = {};
   semanas.forEach(s => { (porProf[s.prof] ||= []).push(s); });
@@ -236,7 +320,7 @@ export const PlanDetail = ({ planId, back }) => {
           </>
         )}
       />
-      <div className="grid" style={{ gridTemplateColumns: '1fr 300px' }}>
+      <div className="grid grid-side-300">
         <div className="card">
           <div className="card-pad" style={{ borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <h3 style={{ fontSize: 15 }}>Habilidades vinculadas</h3>
@@ -306,17 +390,8 @@ export const PlanDetail = ({ planId, back }) => {
         </div>
         {Object.keys(porProf).length === 0 ? (
           <div style={{ padding: '30px 22px', textAlign: 'center', color: 'var(--text-3)', fontSize: 13.5 }}>Nenhum professor preencheu as sequências semanais ainda.</div>
-        ) : Object.entries(porProf).map(([profId, lista]) => (
-          <div key={profId} style={{ padding: '16px 22px', borderBottom: '1px solid var(--border)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-              <Avatar {...(D.prof(profId) || { nome: D.profNome(profId), iniciais: '?', cor: '#64748b' })} size={30} />
-              <span style={{ fontWeight: 700, fontSize: 13.5 }}>{D.profNome(profId)}</span>
-              <span className="badge badge-gray">{lista.length} {lista.length === 1 ? 'semana' : 'semanas'}</span>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {lista.slice().sort((a, b) => a.semana - b.semana).map(s => <SemanaCard key={s.id} s={s} />)}
-            </div>
-          </div>
+        ) : Object.keys(porProf).map(profId => (
+          <ProfSemanas key={profId} profId={profId} turmasRede={turmasRede} />
         ))}
       </div>
 
@@ -325,18 +400,93 @@ export const PlanDetail = ({ planId, back }) => {
   );
 };
 
+/* -------- Modal: nova habilidade no catálogo -------- */
+const NovaHabilidade = ({ onClose, matrizInicial, compInicial }) => {
+  const D = DATA;
+  const [form, setForm] = useState({
+    cod: '', rotulo: '',
+    matriz: matrizInicial || (D.MATRIZES[0] || {}).id || '',
+    comp: compInicial || (D.COMPONENTES[0] || {}).id || '',
+    desc: '',
+  });
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState(null);
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+  const valido = form.cod.trim().length >= 2 && form.desc.trim().length >= 5 && form.matriz && form.comp;
+
+  const salvar = async () => {
+    setSalvando(true);
+    setErro(null);
+    try {
+      await criarHabilidade({
+        cod: form.cod.trim(),
+        ...(form.rotulo.trim() ? { rotulo: form.rotulo.trim() } : {}),
+        matriz: form.matriz, comp: form.comp, desc: form.desc.trim(),
+      });
+      onClose();
+    } catch (err) {
+      setErro(err.message);
+      setSalvando(false);
+    }
+  };
+
+  return (
+    <Modal title="Adicionar habilidade" subtitle="Nova habilidade no catálogo, disponível para vínculo aos planejamentos." icon="skills" width={560} onClose={onClose}
+      footer={<>
+        {erro && <span style={{ color: 'var(--red)', fontWeight: 600, fontSize: 12.5, display: 'flex', alignItems: 'center', gap: 6 }}><I name="info" size={14} />{erro}</span>}
+        <div style={{ flex: 1 }} />
+        <button className="btn btn-ghost" onClick={onClose}>Cancelar</button>
+        <button className="btn btn-primary" disabled={salvando || !valido} style={{ opacity: salvando || !valido ? .6 : 1 }} onClick={salvar}>
+          <I name="check2" size={15} />{salvando ? 'Salvando…' : 'Adicionar habilidade'}
+        </button>
+      </>}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div className="grid grid-cols-2" style={{ gap: 14 }}>
+          <div>
+            <label className="field-label">Código</label>
+            <input className="input" placeholder="Ex.: EF01LP10" value={form.cod} onChange={e => set('cod', e.target.value)} />
+          </div>
+          <div>
+            <label className="field-label">Rótulo <span style={{ color: 'var(--text-4)', fontWeight: 400 }}>(opcional)</span></label>
+            <input className="input" placeholder="Ex.: H10" value={form.rotulo} onChange={e => set('rotulo', e.target.value)} />
+          </div>
+        </div>
+        <div className="grid grid-cols-2" style={{ gap: 14 }}>
+          <div>
+            <label className="field-label">Matriz de referência</label>
+            <select className="input" value={form.matriz} onChange={e => set('matriz', e.target.value)}>
+              {D.MATRIZES.map(m => <option key={m.id} value={m.id}>{m.nome}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="field-label">Componente curricular</label>
+            <select className="input" value={form.comp} onChange={e => set('comp', e.target.value)}>
+              {D.COMPONENTES.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
+            </select>
+          </div>
+        </div>
+        <div>
+          <label className="field-label">Descrição</label>
+          <textarea className="input" rows={4} placeholder="Descreva a habilidade…" value={form.desc} onChange={e => set('desc', e.target.value)} style={{ resize: 'vertical' }} />
+        </div>
+      </div>
+    </Modal>
+  );
+};
+
 /* -------- Catálogo de matrizes & habilidades -------- */
 export const HabilidadesBNCC = () => {
   const D = DATA;
   const [comp, setComp] = useState('todos');
   const [mat, setMat] = useState('todas');
+  const [nova, setNova] = useState(false);
   const list = D.HABILIDADES.filter(h => (comp === 'todos' || h.comp === comp) && (mat === 'todas' || h.matriz === mat));
   return (
     <div className="fade-in">
       <PageHeader title="Matrizes & habilidades" subtitle="Catálogo de habilidades disponíveis para vínculo aos planejamentos, organizadas por matriz de referência (BNCC, SAEB, SEAMA e Habilidades Leitoras) e componente." />
 
       {/* resumo por matriz */}
-      <div className="grid" style={{ gridTemplateColumns: 'repeat(4,1fr)', marginBottom: 18 }}>
+      <div className="grid grid-cols-4" style={{ marginBottom: 18 }}>
         {D.MATRIZES.map(m => {
           const n = D.HABILIDADES.filter(h => h.matriz === m.id).length;
           return (
@@ -364,7 +514,7 @@ export const HabilidadesBNCC = () => {
             {D.COMPONENTES.map(c => <button key={c.id} className={comp === c.id ? 'active' : ''} onClick={() => setComp(c.id)}>{c.nome}</button>)}
           </div>
         </div>
-        <button className="btn btn-primary"><I name="plus" size={15} />Adicionar habilidade</button>
+        <button className="btn btn-primary" onClick={() => setNova(true)}><I name="plus" size={15} />Adicionar habilidade</button>
       </div>
       <div className="card">
         <table className="tbl">
@@ -385,6 +535,9 @@ export const HabilidadesBNCC = () => {
           </tbody>
         </table>
       </div>
+
+      {nova && <NovaHabilidade onClose={() => setNova(false)}
+        matrizInicial={mat !== 'todas' ? mat : null} compInicial={comp !== 'todos' ? comp : null} />}
     </div>
   );
 };

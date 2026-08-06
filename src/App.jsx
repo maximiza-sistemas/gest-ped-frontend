@@ -15,6 +15,8 @@ import { AdminRedeDashboard, AdminEscolas } from './admin.jsx';
 import { AdminEscolaDetail, AdminTurmas, AdminTurmaDetail, AdminAlunos, AdminAlunoFicha, AdminUsers, AdminConfig } from './admin2.jsx';
 import { GruposEscolas } from './grupos.jsx';
 import { AnosEscolares } from './anos.jsx';
+import { ComponentesCurriculares } from './componentes.jsx';
+import { SagApp } from './sag.jsx';
 
 const DEFAULT_ROUTE = { gestor: 'dashboard', professor: 'painel', admin: 'admrede', secretaria: 'admrede' };
 
@@ -49,6 +51,7 @@ const App = () => {
   const [escolaId, setEscolaId] = useState(null);
   const [turmaId, setTurmaId] = useState(null);
   const [admAlunoId, setAdmAlunoId] = useState(null);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   // re-render quando o store hidrata/atualiza DATA
   useEffect(() => subscribe(force), []);
@@ -110,6 +113,8 @@ const App = () => {
       case 'admescolas': view = <AdminEscolas openEscola={setEscolaId} />; break;
       case 'admgrupos': view = <GruposEscolas />; break;
       case 'admanos': view = <AnosEscolares />; break;
+      case 'admcomponentes': view = <ComponentesCurriculares />; break;
+      case 'sag': view = <SagApp />; break;
       case 'admturmas': view = <AdminTurmas openTurma={setTurmaId} />; break;
       case 'admalunos': view = <AdminAlunos openAluno={setAdmAlunoId} />; break;
       case 'admusers': view = <AdminUsers />; break;
@@ -120,9 +125,12 @@ const App = () => {
 
   return (
     <div className="app">
-      <Sidebar user={user} route={route} setRoute={go} onLogout={sair} />
+      <Sidebar user={user} route={route} setRoute={go} onLogout={sair}
+        open={menuOpen} onClose={() => setMenuOpen(false)} />
+      <div className={'sidebar-overlay' + (menuOpen ? ' open' : '')} onClick={() => setMenuOpen(false)} />
       <div className="main">
-        <Topbar route={route} user={user} onSwitch={enter} periodo={periodo} setPeriodo={setPeriodo} />
+        <Topbar route={route} user={user} onSwitch={enter} periodo={periodo} setPeriodo={setPeriodo}
+          onMenu={() => setMenuOpen(o => !o)} />
         <div className="content">
           <div className="content-inner">{view}</div>
         </div>
