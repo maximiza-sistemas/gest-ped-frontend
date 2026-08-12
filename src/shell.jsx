@@ -41,12 +41,12 @@ const NAV = {
       { id: 'periodos', label: 'Períodos', icon: 'calendar' },
     ]},
     { grupo: 'Sistema', itens: [
-      { id: 'sag', label: 'SAG', icon: 'external' },
+      { id: 'sag', label: 'Resultado avaliações', icon: 'external' },
     ]},
   ],
   professor: [
     { grupo: 'Meu trabalho', itens: [
-      { id: 'painel', label: 'Meu painel', icon: 'dashboard' },
+      { id: 'painel', label: 'Dashboard', icon: 'dashboard' },
       { id: 'verificacao', label: 'Verificação contínua', icon: 'check', badge: '4' },
       // 'Níveis de leitura' removido do menu provisoriamente (discussão futura) — rota mantida
     ]},
@@ -55,12 +55,12 @@ const NAV = {
       { id: 'planoprof', label: 'Meu planejamento', icon: 'plan' },
     ]},
     { grupo: 'Sistema', itens: [
-      { id: 'sag', label: 'SAG', icon: 'external' },
+      { id: 'sag', label: 'Resultado avaliações', icon: 'external' },
     ]},
   ],
   admin: [
     { grupo: 'Rede', itens: [
-      { id: 'admrede', label: 'Visão da rede', icon: 'dashboard' },
+      { id: 'admrede', label: 'Dashboard', icon: 'dashboard' },
       { id: 'admgrupos', label: 'Grupos de escolas', icon: 'layers' },
       { id: 'cadastro', label: 'Cadastro', icon: 'folder', children: [
         { id: 'admescolas', label: 'Escolas', icon: 'school', badge: '6' },
@@ -77,7 +77,7 @@ const NAV = {
     { grupo: 'Sistema', itens: [
       { id: 'admusers', label: 'Usuários & acessos', icon: 'user' },
       { id: 'admconfig', label: 'Configurações', icon: 'settings' },
-      { id: 'sag', label: 'SAG', icon: 'external' },
+      { id: 'sag', label: 'Resultado avaliações', icon: 'external' },
     ]},
   ],
 };
@@ -86,16 +86,16 @@ const NAV = {
 NAV.secretaria = NAV.admin;
 
 const TITLES = {
-  dashboard: ['Dashboard consolidado', 'Visão geral do andamento de todos os professores e turmas'],
+  dashboard: ['Dashboard', 'Visão geral e evolução das suas escolas, turmas e alunos'],
   planejamentos: ['Planejamentos', 'Cadastre, vincule habilidades e direcione aos professores'],
   habilidades: ['Matrizes & habilidades', 'Catálogo por matriz de referência: BNCC, SAEB, SEAMA e Habilidades Leitoras'],
   professores: ['Professores & turmas', 'Acompanhe o trabalho de cada professor'],
   periodos: ['Períodos avaliativos', 'Períodos avaliativos do ano letivo'],
-  painel: ['Meu painel', 'Habilidades direcionadas para o período vigente'],
+  painel: ['Dashboard', 'Habilidades direcionadas e evolução das suas turmas e alunos'],
   verificacao: ['Verificação contínua', 'Registre o desempenho individual dos alunos'],
   alunos: ['Meus alunos', 'Turma 1º Ano A · 24 alunos'],
   planoprof: ['Meu planejamento', 'Edite atividades e estratégias do planejamento recebido'],
-  admrede: ['Visão da rede', 'Indicadores da rede de ensino'],
+  admrede: ['Dashboard', 'Indicadores e evolução da rede de ensino'],
   admescolas: ['Escolas', 'Unidades escolares da rede municipal'],
   admgrupos: ['Grupos de escolas', 'Organize as escolas da rede em grupos (polos)'],
   admanos: ['Anos escolares', 'Séries usadas para direcionar os planejamentos'],
@@ -104,7 +104,7 @@ const TITLES = {
   admalunos: ['Alunos', 'Diretório de estudantes da rede'],
   admusers: ['Usuários & acessos', 'Gestão de contas e permissões'],
   admconfig: ['Configurações', 'Parâmetros gerais do sistema'],
-  sag: ['SAG', 'Aplicação integrada da maXXimiza'],
+  sag: ['Resultado avaliações', 'Resultados das avaliações — aplicação integrada da maXXimiza'],
 };
 
 // item de menu expansível (ex.: Cadastro) — abre sozinho quando a rota ativa é de um submenu
@@ -136,7 +136,10 @@ export const Sidebar = ({ user, route, setRoute, onLogout, open, onClose }) => {
   return (
     <aside className={'sidebar' + (open ? ' open' : '')}>
       <div className="brand" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 9 }}>
-        <div className="brand-logo"><img src="/assets/logo-maximiza.png" alt="maXXimiza — Soluções Educacionais" /></div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
+          <div className="brand-logo"><img src="/assets/logo-maximiza.png" alt="maXXimiza — Soluções Educacionais" /></div>
+          <span style={{ color: '#fff', fontWeight: 800, fontSize: 23, letterSpacing: '-.02em' }}>SAG</span>
+        </div>
         <span style={{ fontSize: 11.5, color: '#8da0bf', paddingLeft: 3, display: 'flex', alignItems: 'center', gap: 6 }}>
           <I name="school" size={13} />{escopoLabel(user, D)}
         </span>

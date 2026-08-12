@@ -3,110 +3,33 @@
    ============================================================ */
 import React, { useState } from 'react';
 import { DATA } from './data.js';
-import { PageHeader, I, Stat, Bar, VBars, MatrizBadge, Avatar } from './ui.jsx';
+import { PageHeader, I, Stat, Bar, VBars, MatrizBadge, Avatar, InfoDica } from './ui.jsx';
 import { NovoPlanejamento } from './gestor2.jsx';
 import { excluirPlanejamento } from './store.js';
+import { EvolucaoEscopo } from './evolucao.jsx';
 
 /* -------- Dashboard consolidado -------- */
 export const GestorDashboard = ({ go }) => {
   const D = DATA;
-
-  // % habilidades trabalhadas por professor
-  const porProf = [
-    { label: 'Helena Martins', value: 67, display: '67%', color: '#2563eb', sub: 'LP · 1º Ano A' },
-    { label: 'Rafael Souza',   value: 50, display: '50%', color: '#6d4bd1', sub: 'MAT · 1º Ano A' },
-    { label: 'Beatriz Almeida',value: 33, display: '33%', color: '#0e8aa8', sub: 'LP · 1º Ano B' },
-  ];
-  // avaliações por habilidade (turma 1A LP)
-  const avalHab = [
-    { label: 'LP01', value: 3 }, { label: 'LP02', value: 2 }, { label: 'LP04', value: 4 },
-    { label: 'LP07', value: 1 }, { label: 'LP01b', value: 0, color: 'var(--border-strong)' },
-  ];
-
   return (
     <div className="fade-in">
       <PageHeader
-        title="Dashboard consolidado"
-        subtitle="Acompanhe o andamento de planejamentos e habilidades trabalhadas."
-        actions={<>
-          <button className="btn btn-ghost"><I name="download" size={16} />Exportar relatório</button>
-          <button className="btn btn-primary" onClick={() => go('planejamentos')}><I name="plus" size={16} />Novo planejamento</button>
-        </>}
+        title="Dashboard"
+        subtitle="Suas escolas, turmas e alunos: verificações contínuas, % de atingimento e planejamento."
+        actions={
+          <button className="btn btn-primary" onClick={() => go('planejamentos')}><I name="plan" size={16} />Ver planejamentos</button>
+        }
       />
 
-      <div className="grid grid-cols-4" style={{ marginBottom: 18 }}>
-        <Stat label="Planejamentos ativos" value={D.PLANEJAMENTOS.filter(p => p.status === 'ativo').length} sub="1º Bimestre · 2 turmas" icon="plan" accent="#2563eb" />
-        <Stat label="Habilidades direcionadas" value={D.PLANEJAMENTOS.reduce((s, p) => s + p.habilidades.length, 0)} sub="4 matrizes de referência" icon="skills" accent="#6d4bd1" />
-        <Stat label="Habilidades trabalhadas" value="54%" delta={12} sub="entre as iniciadas" icon="target" accent="#15935f" />
-        <Stat label="Avaliações registradas" value="68" delta={9} sub="nos últimos 30 dias" icon="check" accent="#0e8aa8" />
-      </div>
-
-      {/* Habilidades trabalhadas por professor */}
-      <div className="card card-pad" style={{ marginBottom: 18 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
-          <div>
-            <h3 style={{ fontSize: 15 }}>Habilidades trabalhadas por professor</h3>
-            <p style={{ fontSize: 12.5, color: 'var(--text-3)', marginTop: 2 }}>Percentual do planejamento já iniciado no período</p>
-          </div>
-          <button className="btn btn-subtle btn-sm" onClick={() => go('professores')}>Detalhes<I name="chevR" size={14} /></button>
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-          {porProf.map((p, i) => (
-            <div key={i}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 7 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-                  <span style={{ width: 9, height: 9, borderRadius: 3, background: p.color }} />
-                  <span style={{ fontWeight: 600, fontSize: 13.5 }}>{p.label}</span>
-                  <span className="chip" style={{ fontSize: 11, padding: '1px 8px' }}>{p.sub}</span>
-                </div>
-                <span className="num" style={{ fontWeight: 800, fontSize: 15 }}>{p.display}</span>
-              </div>
-              <Bar value={p.value} color={p.color} height={9} />
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2" style={{ marginBottom: 18 }}>
-        {/* Aderência ao planejamento */}
-        <div className="card card-pad">
-          <h3 style={{ fontSize: 15, marginBottom: 4 }}>Aderência ao planejamento</h3>
-          <p style={{ fontSize: 12.5, color: 'var(--text-3)', marginBottom: 18 }}>Planejado pelo gestor × executado pelo professor</p>
-          {[
-            { l: 'Helena Martins · LP', plan: 6, exec: 4 },
-            { l: 'Rafael Souza · MAT', plan: 4, exec: 2 },
-            { l: 'Beatriz Almeida · LP', plan: 3, exec: 1 },
-          ].map((r, i) => (
-            <div key={i} style={{ marginBottom: 16 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, marginBottom: 6 }}>
-                <span style={{ fontWeight: 600 }}>{r.l}</span>
-                <span className="num" style={{ color: 'var(--text-3)' }}>{r.exec}/{r.plan} habilidades</span>
-              </div>
-              <div style={{ position: 'relative', height: 9, borderRadius: 20, background: 'var(--surface-3)' }}>
-                <div style={{ position: 'absolute', inset: 0, width: '100%', borderRadius: 20, background: 'repeating-linear-gradient(90deg,var(--primary-100),var(--primary-100) 6px,transparent 6px,transparent 12px)' }} />
-                <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: (r.exec / r.plan * 100) + '%', borderRadius: 20, background: 'var(--primary)' }} />
-              </div>
-            </div>
-          ))}
-          <div style={{ display: 'flex', gap: 16, marginTop: 16, fontSize: 11.5, color: 'var(--text-3)' }}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 14, height: 8, borderRadius: 3, background: 'var(--primary)' }} />Executado</span>
-            <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 14, height: 8, borderRadius: 3, background: 'var(--primary-100)' }} />Planejado</span>
-          </div>
-        </div>
-
-        {/* Avaliações por habilidade */}
-        <div className="card card-pad">
-          <h3 style={{ fontSize: 15, marginBottom: 4 }}>Avaliações por habilidade</h3>
-          <p style={{ fontSize: 12.5, color: 'var(--text-3)', marginBottom: 6 }}>Quantas vezes cada habilidade foi avaliada · LP · 1º Ano A</p>
-          <VBars data={avalHab.map(d => ({ ...d, label: d.label.replace('b', '') }))} height={170} />
-        </div>
-      </div>
-
-      {/* Habilidades por matriz de referência */}
+      <EvolucaoEscopo contagens secao>
+      {/* Habilidades por matriz de referência — conteúdo do perfil, antes da seção Evolução */}
       <div className="card card-pad" style={{ marginBottom: 18 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
           <div>
-            <h3 style={{ fontSize: 15 }}>Habilidades por matriz de referência</h3>
+            <h3 style={{ fontSize: 15, display: 'flex', alignItems: 'center', gap: 6 }}>
+              Habilidades por matriz de referência
+              <InfoDica titulo="Habilidades por matriz" texto="Quantas habilidades de cada matriz de referência (BNCC, SAEB, SEAMA, CNCA) estão vinculadas aos planejamentos direcionados, sobre o total disponível no catálogo." />
+            </h3>
             <p style={{ fontSize: 12.5, color: 'var(--text-3)', marginTop: 2 }}>Acompanhamento vinculado a BNCC, SAEB, SEAMA e Habilidades Leitoras</p>
           </div>
           <button className="btn btn-subtle btn-sm" onClick={() => go('habilidades')}>Ver catálogo<I name="chevR" size={14} /></button>
@@ -129,6 +52,7 @@ export const GestorDashboard = ({ go }) => {
           })}
         </div>
       </div>
+      </EvolucaoEscopo>
     </div>
   );
 };

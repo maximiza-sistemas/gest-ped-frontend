@@ -2,74 +2,9 @@
    Admin — primitivos compartilhados + Visão da rede + Escolas
    ============================================================ */
 import React, { useState } from 'react';
-import { DATA, adminCriarEscola, adminEditarEscola, adminExcluirEscola } from './store.js';
-import { PageHeader, Stat, I, ICONS, Modal, MatrizBadge } from './ui.jsx';
-
-const PALETA_ESC = ['#2563eb', '#0e8aa8', '#6d4bd1', '#15935f', '#c2410c', '#be123c', '#475569', '#7c3aed'];
-
-/* -------- Formulário de escola (criar/editar) -------- */
-export const EscolaForm = ({ titulo, inicial, onSave, onClose }) => {
-  const [f, setF] = useState(inicial);
-  const [salvando, setSalvando] = useState(false);
-  const [erro, setErro] = useState(null);
-  const set = (k, v) => setF(x => ({ ...x, [k]: v }));
-  const salvar = async () => {
-    if (!f.nome || f.nome.trim().length < 3) { setErro('Informe o nome da escola.'); return; }
-    if (!f.sigla || f.sigla.trim().length < 2) { setErro('Informe uma sigla (mín. 2 letras).'); return; }
-    setSalvando(true); setErro(null);
-    try { await onSave(f); onClose(); } catch (err) { setErro(err.message); setSalvando(false); }
-  };
-  const foot = (
-    <>
-      {erro && <span style={{ color: 'var(--red)', fontWeight: 600, fontSize: 12.5 }}>{erro}</span>}
-      <div style={{ flex: 1 }} />
-      <button className="btn btn-ghost" onClick={onClose}>Cancelar</button>
-      <button className="btn btn-primary" disabled={salvando} onClick={salvar} style={{ opacity: salvando ? .6 : 1 }}><I name="check2" size={15} />{salvando ? 'Salvando…' : 'Salvar'}</button>
-    </>
-  );
-  return (
-    <Modal title={titulo} icon="school" width={500} onClose={onClose} footer={foot}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-        <div className="grid grid-2-1" style={{ gap: 14 }}>
-          <div>
-            <label className="field-label">Nome da escola</label>
-            <input className="input" value={f.nome} onChange={e => set('nome', e.target.value)} placeholder="Ex.: EMEF Anísio Teixeira" />
-          </div>
-          <div>
-            <label className="field-label">Sigla</label>
-            <input className="input" value={f.sigla} onChange={e => set('sigla', e.target.value.toUpperCase())} placeholder="EAT" maxLength={4} />
-          </div>
-        </div>
-        <div className="grid grid-cols-2" style={{ gap: 14 }}>
-          <div>
-            <label className="field-label">Zona</label>
-            <select className="input" value={f.zona} onChange={e => set('zona', e.target.value)}>
-              <option value="Urbana">Urbana</option>
-              <option value="Rural">Rural</option>
-            </select>
-          </div>
-          <div>
-            <label className="field-label">Bairro</label>
-            <input className="input" value={f.bairro} onChange={e => set('bairro', e.target.value)} placeholder="Ex.: Centro" />
-          </div>
-        </div>
-        <div>
-          <label className="field-label">Diretor(a)</label>
-          <input className="input" value={f.diretor} onChange={e => set('diretor', e.target.value)} placeholder="Nome do diretor(a)" />
-        </div>
-        <div>
-          <label className="field-label">Cor de identificação</label>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            {PALETA_ESC.map(c => (
-              <button key={c} type="button" onClick={() => set('cor', c)}
-                style={{ width: 30, height: 30, borderRadius: 8, background: c, border: f.cor === c ? '3px solid var(--text)' : '2px solid var(--border)', cursor: 'pointer' }} />
-            ))}
-          </div>
-        </div>
-      </div>
-    </Modal>
-  );
-};
+import { DATA } from './store.js';
+import { PageHeader, Stat, I, ICONS, MatrizBadge, InfoDica, Paginacao } from './ui.jsx';
+import { EvolucaoEscopo } from './evolucao.jsx';
 
 // ícones extras (registrados no catálogo compartilhado de ícones)
 ICONS.school = ['M3 21h18', 'M5 21V8l7-5 7 5v13', 'M9 21v-6h6v6', 'M9 11h.01M15 11h.01'];
@@ -90,6 +25,10 @@ export const AdminRedeDashboard = ({ openEscola }) => {
   const r = D.rede();
   const escolas = D.escolasFull();
   const ranking = [...escolas].sort((a, b) => b.totAlunos - a.totAlunos);
+  // paginação do ranking (mesma lógica das tabelas do Cadastro)
+  const [pagina, setPagina] = useState(0);
+  const [tamanho, setTamanho] = useState(50);
+  const rankingPagina = ranking.slice(pagina * tamanho, (pagina + 1) * tamanho);
   const urbanas = escolas.filter(e => e.zona === 'Urbana');
   const rurais = escolas.filter(e => e.zona === 'Rural');
   const sumAl = arr => arr.reduce((s, e) => s + e.totAlunos, 0);
@@ -106,7 +45,7 @@ export const AdminRedeDashboard = ({ openEscola }) => {
   return (
     <div className="fade-in">
       <PageHeader
-        title="Visão da rede"
+        title="Dashboard"
         subtitle={`${D.REDE.secretaria} · ${D.REDE.municipio}/${D.REDE.uf} · ano letivo ${D.REDE.ano}. Indicadores da rede de ensino.`}
         actions={<>
           <button className="btn btn-ghost"><I name="download" size={16} />Relatório da rede</button>
@@ -115,17 +54,24 @@ export const AdminRedeDashboard = ({ openEscola }) => {
       />
 
       <div className="grid grid-cols-4" style={{ marginBottom: 18 }}>
-        <Stat label="Escolas" value={r.escolas} sub={`${urbanas.length} urbanas · ${rurais.length} rurais`} icon="school" accent="#2563eb" />
-        <Stat label="Alunos matriculados" value={fmt(r.alunos)} sub="anos iniciais" icon="users" accent="#6d4bd1" />
-        <Stat label="Turmas" value={r.turmas} sub="na rede" icon="grid" accent="#0e8aa8" />
-        <Stat label="Professores" value={r.professores} sub="ativos" icon="grad" accent="#15935f" />
+        <Stat label="Escolas" value={r.escolas} sub={`${urbanas.length} urbanas · ${rurais.length} rurais`} icon="school" accent="#2563eb"
+          info="Unidades escolares cadastradas na rede municipal, incluindo as espelhadas automaticamente do SAG, separadas por zona urbana e rural." />
+        <Stat label="Alunos matriculados" value={fmt(r.alunos)} sub="anos iniciais" icon="users" accent="#6d4bd1"
+          info="Total de alunos matriculados em todas as turmas de todas as escolas da rede." />
+        <Stat label="Turmas" value={r.turmas} sub="na rede" icon="grid" accent="#0e8aa8"
+          info="Total de turmas cadastradas em todas as escolas da rede." />
+        <Stat label="Professores" value={r.professores} sub="ativos" icon="grad" accent="#15935f"
+          info="Soma do quadro de professores informado no cadastro de cada escola." />
       </div>
 
       {/* Análise das habilidades direcionadas */}
       <div className="card card-pad" style={{ marginBottom: 18 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16, gap: 12, flexWrap: 'wrap' }}>
           <div>
-            <h3 style={{ fontSize: 15 }}>Análise das habilidades direcionadas</h3>
+            <h3 style={{ fontSize: 15, display: 'flex', alignItems: 'center', gap: 6 }}>
+              Análise das habilidades direcionadas
+              <InfoDica titulo="Habilidades direcionadas" texto="Habilidades presentes nos planejamentos ativos direcionados pela Secretaria, agrupadas pela matriz de referência de origem (BNCC, SAEB, SEAMA, CNCA)." />
+            </h3>
             <p style={{ fontSize: 12.5, color: 'var(--text-3)', marginTop: 2 }}>
               {ativos.length} planejamento{ativos.length === 1 ? '' : 's'} ativo{ativos.length === 1 ? '' : 's'} · {habsDirecionadas.length} habilidades distintas direcionadas, por matriz de referência
             </p>
@@ -162,9 +108,9 @@ export const AdminRedeDashboard = ({ openEscola }) => {
         <table className="tbl">
           <thead><tr><th style={{ width: 34 }}>#</th><th>Escola</th><th>Zona</th><th style={{ textAlign: 'center' }}>Alunos</th><th></th></tr></thead>
           <tbody>
-            {ranking.map((e, i) => (
+            {rankingPagina.map((e, i) => (
               <tr key={e.id} className="clickable" onClick={() => openEscola(e.id)}>
-                <td className="num" style={{ color: 'var(--text-3)', fontWeight: 700 }}>{i + 1}</td>
+                <td className="num" style={{ color: 'var(--text-3)', fontWeight: 700 }}>{pagina * tamanho + i + 1}</td>
                 <td>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
                     <div style={{ width: 32, height: 32, borderRadius: 8, background: e.cor + '18', color: e.cor, display: 'grid', placeItems: 'center', fontWeight: 800, fontSize: 11, flex: 'none' }}>{e.sigla}</div>
@@ -181,6 +127,8 @@ export const AdminRedeDashboard = ({ openEscola }) => {
             ))}
           </tbody>
         </table>
+        <Paginacao total={ranking.length} pagina={pagina} setPagina={setPagina}
+          tamanho={tamanho} setTamanho={setTamanho} rotulo="escolas" />
       </div>
 
       {/* Resumo por zona */}
@@ -194,6 +142,9 @@ export const AdminRedeDashboard = ({ openEscola }) => {
           </div>
         ))}
       </div>
+
+      {/* Evolução da rede: verificações, atingimento e drill escola → turma → aluno */}
+      <EvolucaoEscopo secao />
     </div>
   );
 };
@@ -202,21 +153,14 @@ export const AdminRedeDashboard = ({ openEscola }) => {
 export const AdminEscolas = ({ openEscola }) => {
   const D = DATA;
   const escolas = D.escolasFull();
-  const [novo, setNovo] = useState(false);
-  const [editar, setEditar] = useState(null);
-  const criar = f => adminCriarEscola({ nome: f.nome.trim(), sigla: f.sigla.trim(), zona: f.zona, bairro: f.bairro, diretor: f.diretor, cor: f.cor });
-  const salvarEdicao = f => adminEditarEscola(editar.id, { nome: f.nome.trim(), sigla: f.sigla.trim(), zona: f.zona, bairro: f.bairro, diretor: f.diretor, cor: f.cor });
-  const excluir = async e => {
-    if (e.totTurmas > 0) return alert(`A escola "${e.nome}" tem ${e.totTurmas} turma(s). Exclua ou transfira as turmas antes.`);
-    if (!window.confirm(`Excluir a escola "${e.nome}"?`)) return;
-    try { await adminExcluirEscola(e.id); } catch (err) { alert(err.message); }
-  };
+  const [pagina, setPagina] = useState(0);
+  const [tamanho, setTamanho] = useState(24);
+  const visiveis = escolas.slice(pagina * tamanho, (pagina + 1) * tamanho);
   return (
     <div className="fade-in">
-      <PageHeader title="Escolas" subtitle="Unidades escolares da rede municipal. Selecione uma escola para ver turmas, alunos e indicadores."
-        actions={<button className="btn btn-primary" onClick={() => setNovo(true)}><I name="plus" size={15} />Nova escola</button>} />
+      <PageHeader title="Escolas" subtitle="Unidades escolares sincronizadas automaticamente do SAG (somente leitura). Selecione uma escola para ver turmas, alunos e indicadores." />
       <div className="grid grid-cols-3">
-        {escolas.map(e => (
+        {visiveis.map(e => (
           <div key={e.id} className="card card-pad" onClick={() => openEscola(e.id)} style={{ textAlign: 'left', display: 'flex', flexDirection: 'column', gap: 14, cursor: 'pointer', transition: 'box-shadow .15s, transform .15s' }}
             onMouseEnter={ev => { ev.currentTarget.style.boxShadow = 'var(--shadow)'; ev.currentTarget.style.transform = 'translateY(-2px)'; }}
             onMouseLeave={ev => { ev.currentTarget.style.boxShadow = 'var(--shadow-sm)'; ev.currentTarget.style.transform = 'none'; }}>
@@ -226,11 +170,7 @@ export const AdminEscolas = ({ openEscola }) => {
                 <div style={{ fontWeight: 700, fontSize: 14.5, lineHeight: 1.25 }}>{e.nome}</div>
                 <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 3, display: 'flex', alignItems: 'center', gap: 5 }}><I name="pin" size={12} />{e.bairro}</div>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }} onClick={ev => ev.stopPropagation()}>
-                <ZonaBadge zona={e.zona} />
-                <button className="icon-btn" title="Editar escola" onClick={() => setEditar(e)}><I name="edit" size={14} /></button>
-                <button className="icon-btn" title="Excluir escola" onClick={() => excluir(e)}><I name="x" size={14} /></button>
-              </div>
+              <ZonaBadge zona={e.zona} />
             </div>
             <div style={{ display: 'flex', gap: 18, paddingTop: 4 }}>
               {[['Turmas', e.totTurmas], ['Alunos', e.totAlunos], ['Professores', e.professores]].map((s, i) => (
@@ -244,11 +184,10 @@ export const AdminEscolas = ({ openEscola }) => {
           </div>
         ))}
       </div>
-
-      {novo && <EscolaForm titulo="Nova escola" onClose={() => setNovo(false)} onSave={criar}
-        inicial={{ nome: '', sigla: '', zona: 'Urbana', bairro: '', diretor: '', cor: PALETA_ESC[0] }} />}
-      {editar && <EscolaForm titulo={'Editar — ' + editar.nome} onClose={() => setEditar(null)} onSave={salvarEdicao}
-        inicial={{ nome: editar.nome, sigla: editar.sigla, zona: editar.zona, bairro: editar.bairro || '', diretor: editar.diretor || '', cor: editar.cor || PALETA_ESC[0] }} />}
+      <div className="card" style={{ marginTop: 16 }}>
+        <Paginacao total={escolas.length} pagina={pagina} setPagina={setPagina}
+          tamanho={tamanho} setTamanho={setTamanho} opcoes={[12, 24, 48, 96]} rotulo="escolas" style={{ borderTop: 'none' }} />
+      </div>
     </div>
   );
 };

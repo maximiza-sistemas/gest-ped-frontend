@@ -12,7 +12,7 @@ import { ProfessorPainel, VerificacaoContinua } from './professor.jsx';
 import { MeusAlunos, MeuPlanejamento } from './professor2.jsx';
 import { FichaAluno } from './aluno.jsx';
 import { AdminRedeDashboard, AdminEscolas } from './admin.jsx';
-import { AdminEscolaDetail, AdminTurmas, AdminTurmaDetail, AdminAlunos, AdminAlunoFicha, AdminUsers, AdminConfig } from './admin2.jsx';
+import { AdminEscolaDetail, AdminTurmas, AdminAlunos, AdminUsers, AdminConfig } from './admin2.jsx';
 import { GruposEscolas } from './grupos.jsx';
 import { AnosEscolares } from './anos.jsx';
 import { ComponentesCurriculares } from './componentes.jsx';
@@ -23,8 +23,11 @@ const DEFAULT_ROUTE = { gestor: 'dashboard', professor: 'painel', admin: 'admred
 const Splash = ({ erro, onRetry }) => (
   <div style={{ height: '100%', display: 'grid', placeItems: 'center', background: 'var(--surface-2)' }}>
     <div style={{ textAlign: 'center' }} className="fade-in">
-      <div style={{ background: '#fff', borderRadius: 14, padding: '14px 20px', display: 'inline-flex', boxShadow: 'var(--shadow)' }}>
-        <img src="/assets/logo-maximiza.png" alt="maXXimiza" style={{ height: 40 }} />
+      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 12 }}>
+        <div style={{ background: '#fff', borderRadius: 14, padding: '14px 20px', display: 'inline-flex', boxShadow: 'var(--shadow)' }}>
+          <img src="/assets/logo-maximiza.png" alt="maXXimiza" style={{ height: 40 }} />
+        </div>
+        <span style={{ fontSize: 30, fontWeight: 800, letterSpacing: '-.02em', color: 'var(--text)' }}>SAG</span>
       </div>
       {erro ? (
         <>
@@ -49,14 +52,12 @@ const App = () => {
   const [alunoId, setAlunoId] = useState(null);
   // drill-down admin
   const [escolaId, setEscolaId] = useState(null);
-  const [turmaId, setTurmaId] = useState(null);
-  const [admAlunoId, setAdmAlunoId] = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
 
   // re-render quando o store hidrata/atualiza DATA
   useEffect(() => subscribe(force), []);
 
-  const clearDrill = () => { setPlanId(null); setAlunoId(null); setEscolaId(null); setTurmaId(null); setAdmAlunoId(null); };
+  const clearDrill = () => { setPlanId(null); setAlunoId(null); setEscolaId(null); };
   const enter = u => {
     setUser(u);
     setRoute(DEFAULT_ROUTE[u.perfil]);
@@ -92,9 +93,7 @@ const App = () => {
   // overlays (prioridade do mais profundo ao mais raso)
   if (alunoId) view = <FichaAluno alunoId={alunoId} back={() => setAlunoId(null)} />;
   else if (planId) view = <PlanDetail planId={planId} back={() => setPlanId(null)} />;
-  else if (admAlunoId) view = <AdminAlunoFicha alunoId={admAlunoId} back={() => setAdmAlunoId(null)} />;
-  else if (turmaId) view = <AdminTurmaDetail turmaId={turmaId} back={() => setTurmaId(null)} openAluno={setAdmAlunoId} />;
-  else if (escolaId) view = <AdminEscolaDetail escolaId={escolaId} back={() => setEscolaId(null)} openTurma={setTurmaId} />;
+  else if (escolaId) view = <AdminEscolaDetail escolaId={escolaId} back={() => setEscolaId(null)} />;
   else {
     switch (route) {
       // gestor
@@ -104,7 +103,7 @@ const App = () => {
       case 'professores': view = <ProfessoresTurmas openAluno={setAlunoId} />; break;
       case 'periodos': view = <Periodos irParaPlanejamentos={irPlanejamentosPeriodo} />; break;
       // professor
-      case 'painel': view = <ProfessorPainel go={go} />; break;
+      case 'painel': view = <ProfessorPainel go={go} openAluno={setAlunoId} />; break;
       case 'verificacao': view = <VerificacaoContinua openAluno={setAlunoId} />; break;
       case 'alunos': view = <MeusAlunos openAluno={setAlunoId} />; break;
       case 'planoprof': view = <MeuPlanejamento />; break;
@@ -115,8 +114,8 @@ const App = () => {
       case 'admanos': view = <AnosEscolares />; break;
       case 'admcomponentes': view = <ComponentesCurriculares />; break;
       case 'sag': view = <SagApp />; break;
-      case 'admturmas': view = <AdminTurmas openTurma={setTurmaId} />; break;
-      case 'admalunos': view = <AdminAlunos openAluno={setAdmAlunoId} />; break;
+      case 'admturmas': view = <AdminTurmas />; break;
+      case 'admalunos': view = <AdminAlunos />; break;
       case 'admusers': view = <AdminUsers />; break;
       case 'admconfig': view = <AdminConfig />; break;
       default: view = <div className="card card-pad">Em construção</div>;

@@ -61,11 +61,38 @@ export const Avatar = ({ nome, iniciais, cor, size = 36 }) => {
   return <div className="avatar" style={{ width: size, height: size, background: cor || '#64748b', fontSize: size * .36 }}>{ini}</div>;
 };
 
+/* ---------------- Dica de indicador (descrição ao passar o mouse) ---------------- */
+export const InfoDica = ({ titulo, texto }) => {
+  const [aberta, setAberta] = useState(false);
+  return (
+    <span
+      style={{ position: 'relative', display: 'inline-flex', cursor: 'help', color: 'var(--text-4)' }}
+      tabIndex={0}
+      aria-label={(titulo ? titulo + ': ' : '') + texto}
+      onMouseEnter={() => setAberta(true)} onMouseLeave={() => setAberta(false)}
+      onFocus={() => setAberta(true)} onBlur={() => setAberta(false)}
+    >
+      <I name="info" size={13.5} />
+      {aberta && (
+        <span role="tooltip" style={{ position: 'absolute', top: 'calc(100% + 9px)', left: '50%', transform: 'translateX(-50%)',
+          zIndex: 40, width: 240, background: '#111a2f', color: '#dbe4f5', borderRadius: 10, padding: '10px 12px',
+          boxShadow: 'var(--shadow-lg)', fontSize: 12, lineHeight: 1.5, fontWeight: 500, whiteSpace: 'normal',
+          textAlign: 'left', pointerEvents: 'none' }}>
+          {titulo && <b style={{ display: 'block', color: '#fff', marginBottom: 3 }}>{titulo}</b>}
+          {texto}
+        </span>
+      )}
+    </span>
+  );
+};
+
 /* ---------------- Stat card ---------------- */
-export const Stat = ({ label, value, sub, delta, icon, accent }) => (
+export const Stat = ({ label, value, sub, delta, icon, accent, info }) => (
   <div className="card card-pad" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-      <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-2)' }}>{label}</span>
+      <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-2)', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+        {label}{info && <InfoDica titulo={label} texto={info} />}
+      </span>
       {icon && <div style={{ width: 32, height: 32, borderRadius: 9, display: 'grid', placeItems: 'center',
         background: accent ? accent + '18' : 'var(--surface-3)', color: accent || 'var(--text-2)' }}><I name={icon} size={17} /></div>}
     </div>
@@ -184,6 +211,39 @@ export const LineChart = ({ series, labels, height = 200, yMax = 5, yLabels }) =
         );
       })}
     </svg>
+  );
+};
+
+/* ---------------- Paginação com seletor de itens por página ---------------- */
+export const Paginacao = ({ total, pagina, setPagina, tamanho, setTamanho, opcoes = [25, 50, 100, 200], rotulo = 'itens', style }) => {
+  const totalPaginas = Math.max(1, Math.ceil(total / tamanho));
+  const ini = total === 0 ? 0 : pagina * tamanho + 1;
+  const fim = Math.min(total, (pagina + 1) * tamanho);
+  const fmtN = n => n.toLocaleString('pt-BR');
+  const mudarTamanho = v => { setTamanho(v); setPagina(0); };
+  const Btn = ({ children, disabled, onClick }) => (
+    <button className="btn btn-subtle btn-sm" disabled={disabled} style={{ opacity: disabled ? .5 : 1 }} onClick={onClick}>{children}</button>
+  );
+  return (
+    <div style={{ padding: '10px 16px', borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', ...style }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+        <label style={{ fontSize: 12.5, color: 'var(--text-3)', display: 'flex', alignItems: 'center', gap: 7, fontWeight: 600 }}>
+          Itens por página
+          <select className="input" value={tamanho} onChange={e => mudarTamanho(+e.target.value)} style={{ height: 32, width: 78, padding: '0 8px' }}>
+            {opcoes.map(o => <option key={o} value={o}>{o}</option>)}
+          </select>
+        </label>
+        <span style={{ fontSize: 12.5, color: 'var(--text-3)' }}>
+          Mostrando <b className="num" style={{ color: 'var(--text-2)' }}>{fmtN(ini)}–{fmtN(fim)}</b> de <b className="num" style={{ color: 'var(--text-2)' }}>{fmtN(total)}</b> {rotulo} · Página <b className="num" style={{ color: 'var(--text-2)' }}>{fmtN(pagina + 1)}</b> de <b className="num" style={{ color: 'var(--text-2)' }}>{fmtN(totalPaginas)}</b>
+        </span>
+      </div>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <Btn disabled={pagina === 0} onClick={() => setPagina(0)}>« Primeira</Btn>
+        <Btn disabled={pagina === 0} onClick={() => setPagina(pagina - 1)}><I name="chevL" size={14} />Anterior</Btn>
+        <Btn disabled={pagina + 1 >= totalPaginas} onClick={() => setPagina(pagina + 1)}>Próxima<I name="chevR" size={14} /></Btn>
+        <Btn disabled={pagina + 1 >= totalPaginas} onClick={() => setPagina(totalPaginas - 1)}>Última »</Btn>
+      </div>
+    </div>
   );
 };
 

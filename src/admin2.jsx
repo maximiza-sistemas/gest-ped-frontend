@@ -3,10 +3,11 @@
    Ficha de leitura, Usuários, Configurações
    ============================================================ */
 import React, { useState, useEffect } from 'react';
-import { DATA, fetchTurmaFull, fetchAlunoFull, fetchAvaliacoesAluno, adminCriarUsuario, adminEditarUsuario, adminExcluirUsuario, adminConfig, adminSalvarConfig,
-  adminCriarTurma, adminEditarTurma, adminExcluirTurma, adminCriarAluno, adminEditarAluno, adminExcluirAluno, adminEditarEscola, fetchTurmas, fetchAlunos } from './store.js';
-import { PageHeader, Stat, I, Avatar, Modal } from './ui.jsx';
-import { ZonaBadge, fmt, EscolaForm } from './admin.jsx';
+import { DATA, adminCriarUsuario, adminEditarUsuario, adminExcluirUsuario, adminConfig, adminSalvarConfig,
+  fetchTurmas, fetchAlunos } from './store.js';
+import { PageHeader, Stat, I, Avatar, Modal, Paginacao, Bar } from './ui.jsx';
+import { useEvolucao } from './evolucao.jsx';
+import { ZonaBadge } from './admin.jsx';
 
 const Carregando = ({ back }) => (
   <div className="fade-in">
@@ -16,12 +17,13 @@ const Carregando = ({ back }) => (
 );
 
 /* -------- Detalhe da escola -------- */
-export const AdminEscolaDetail = ({ escolaId, back, openTurma }) => {
+export const AdminEscolaDetail = ({ escolaId, back }) => {
   const D = DATA;
-  const [editando, setEditando] = useState(false);
+  // aplicação e atingimento por turma (drill do endpoint de evolução)
+  const { dados: evolucao } = useEvolucao({ escola: escolaId });
   const e = D.escola(escolaId);
   if (!e) return <Carregando back={back} />;
-  const salvarEscola = f => adminEditarEscola(e.id, { nome: f.nome.trim(), sigla: f.sigla.trim(), zona: f.zona, bairro: f.bairro, diretor: f.diretor, cor: f.cor });
+  const statsTurma = new Map(((evolucao && evolucao.turmasDetalhe) || []).map(t => [t.id, t]));
   return (
     <div className="fade-in">
       <button className="btn btn-subtle btn-sm" style={{ marginBottom: 16 }} onClick={back}><I name="chevL" size={15} />Voltar às escolas</button>
@@ -36,7 +38,6 @@ export const AdminEscolaDetail = ({ escolaId, back, openTurma }) => {
             <span className="chip">Anos: {e.anos.map(a => D.anoNome(a)).join(', ')}</span>
           </div>
         </div>
-        <button className="btn btn-ghost" onClick={() => setEditando(true)}><I name="edit" size={15} />Editar escola</button>
       </div>
 
       <div className="grid grid-cols-3" style={{ marginBottom: 18 }}>
@@ -48,105 +49,72 @@ export const AdminEscolaDetail = ({ escolaId, back, openTurma }) => {
       <h3 style={{ fontSize: 15, marginBottom: 12 }}>Turmas · {e.totTurmas}</h3>
       <div className="card">
         <table className="tbl">
-          <thead><tr><th>Turma</th><th>Ano</th><th>Turno</th><th style={{ textAlign: 'center' }}>Alunos</th><th></th></tr></thead>
+          <thead><tr>
+            <th>Turma</th><th>Ano</th><th>Turno</th>
+            <th style={{ textAlign: 'center' }}>Alunos</th>
+            <th>% aplicado</th>
+            <th>Atingiu × Não atingiu</th>
+          </tr></thead>
           <tbody>
-            {e.turmas.map(t => (
-              <tr key={t.id} className="clickable" onClick={() => openTurma(t.id)}>
-                <td style={{ fontWeight: 600 }}>{t.nome}</td>
-                <td style={{ color: 'var(--text-2)' }}>{D.anoNome(t.ano)}</td>
-                <td style={{ color: 'var(--text-2)' }}>{t.turno}</td>
-                <td className="num" style={{ textAlign: 'center', fontWeight: 600 }}>{t.alunos.length}</td>
-                <td style={{ textAlign: 'right' }}><I name="chevR" size={16} style={{ color: 'var(--text-4)' }} /></td>
-              </tr>
-            ))}
+            {e.turmas.map(t => {
+              const s = statsTurma.get(t.id);
+              const aplicado = s && t.alunos.length ? Math.round((s.alunosAvaliados / t.alunos.length) * 100) : 0;
+              const nao = s ? s.avaliacoes - s.atingiram : 0;
+              return (
+                <tr key={t.id}>
+                  <td style={{ fontWeight: 600 }}>{t.nome}</td>
+                  <td style={{ color: 'var(--text-2)' }}>{D.anoNome(t.ano)}</td>
+                  <td style={{ color: 'var(--text-2)' }}>{t.turno}</td>
+                  <td className="num" style={{ textAlign: 'center', fontWeight: 600 }}>{t.alunos.length}</td>
+                  <td style={{ minWidth: 160 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span className="num" style={{ fontSize: 12, fontWeight: 700, width: 36, textAlign: 'right' }}>{aplicado}%</span>
+                      <div style={{ flex: 1 }}><Bar value={aplicado} height={7} /></div>
+                      <span className="num" style={{ fontSize: 11, color: 'var(--text-3)', width: 42 }}>{s ? s.alunosAvaliados : 0}/{t.alunos.length}</span>
+                    </div>
+                  </td>
+                  <td style={{ minWidth: 180 }}>
+                    {s && s.avaliacoes > 0 ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }} title={`${s.atingiram} atingiram · ${nao} não atingiram`}>
+                        <span className="num" style={{ fontSize: 12, fontWeight: 700, color: 'var(--green)', width: 24, textAlign: 'right' }}>{s.atingiram}</span>
+                        <div style={{ flex: 1, display: 'flex', height: 8, borderRadius: 20, overflow: 'hidden', background: 'var(--surface-3)' }}>
+                          <div style={{ width: (s.atingiram / s.avaliacoes * 100) + '%', background: 'var(--green)' }} />
+                          <div style={{ width: (nao / s.avaliacoes * 100) + '%', background: 'var(--red)' }} />
+                        </div>
+                        <span className="num" style={{ fontSize: 12, fontWeight: 700, color: 'var(--red)', width: 24 }}>{nao}</span>
+                      </div>
+                    ) : (
+                      <span style={{ fontSize: 12, color: 'var(--text-4)' }}>Sem avaliações</span>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
 
-      {editando && <EscolaForm titulo={'Editar — ' + e.nome} onClose={() => setEditando(false)} onSave={salvarEscola}
-        inicial={{ nome: e.nome, sigla: e.sigla, zona: e.zona, bairro: e.bairro || '', diretor: e.diretor || '', cor: e.cor }} />}
     </div>
   );
 };
 
-/* -------- Formulário de turma (criar/editar) -------- */
-const TurmaForm = ({ titulo, inicial, onSave, onClose }) => {
-  const D = DATA;
-  const [f, setF] = useState(inicial);
-  const [salvando, setSalvando] = useState(false);
-  const [erro, setErro] = useState(null);
-  const set = (k, v) => setF(x => ({ ...x, [k]: v }));
-  const salvar = async () => {
-    if (!f.escola) { setErro('Selecione a escola.'); return; }
-    if (!f.nome || f.nome.trim().length < 2) { setErro('Informe o nome da turma.'); return; }
-    setSalvando(true); setErro(null);
-    try { await onSave(f); onClose(); } catch (err) { setErro(err.message); setSalvando(false); }
-  };
-  const foot = (
-    <>
-      {erro && <span style={{ color: 'var(--red)', fontWeight: 600, fontSize: 12.5 }}>{erro}</span>}
-      <div style={{ flex: 1 }} />
-      <button className="btn btn-ghost" onClick={onClose}>Cancelar</button>
-      <button className="btn btn-primary" disabled={salvando} onClick={salvar} style={{ opacity: salvando ? .6 : 1 }}><I name="check2" size={15} />{salvando ? 'Salvando…' : 'Salvar'}</button>
-    </>
-  );
-  return (
-    <Modal title={titulo} icon="grid" width={460} onClose={onClose} footer={foot}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-        <div>
-          <label className="field-label">Escola</label>
-          <select className="input" value={f.escola} onChange={e => set('escola', e.target.value)}>
-            <option value="">Selecione…</option>
-            {(D.ESCOLAS || []).map(e => <option key={e.id} value={e.id}>{e.nome}</option>)}
-          </select>
-        </div>
-        <div className="grid grid-main-aside" style={{ gap: 14 }}>
-          <div>
-            <label className="field-label">Nome da turma</label>
-            <input className="input" value={f.nome} onChange={e => set('nome', e.target.value)} placeholder="Ex.: 1º Ano A" />
-          </div>
-          <div>
-            <label className="field-label">Ano escolar</label>
-            <select className="input" value={f.ano} onChange={e => set('ano', +e.target.value)}>
-              {D.ANOS.map(a => <option key={a.ordem} value={a.ordem}>{a.nome}</option>)}
-            </select>
-          </div>
-        </div>
-        <div>
-          <label className="field-label">Turno</label>
-          <select className="input" value={f.turno} onChange={e => set('turno', e.target.value)}>
-            {['Matutino', 'Vespertino', 'Integral'].map(t => <option key={t} value={t}>{t}</option>)}
-          </select>
-        </div>
-      </div>
-    </Modal>
-  );
-};
-
 /* -------- Turmas (rede inteira) -------- */
-export const AdminTurmas = ({ openTurma }) => {
+export const AdminTurmas = () => {
   const D = DATA;
   const escolas = D.escolasFull();
   const [escFilter, setEscFilter] = useState('todas');
   const [anoFilter, setAnoFilter] = useState('todos');
-  const [novo, setNovo] = useState(false);
-  const [editar, setEditar] = useState(null);
+  const [pagina, setPagina] = useState(0);
+  const [tamanho, setTamanho] = useState(50);
+  useEffect(() => { setPagina(0); }, [escFilter, anoFilter]);
   let turmas = [];
   escolas.forEach(e => { if (escFilter === 'todas' || escFilter === e.id) e.turmas.forEach(t => turmas.push({ ...t, escolaId: e.id, escolaNome: e.nome, escolaCor: e.cor, sigla: e.sigla })); });
   if (anoFilter !== 'todos') turmas = turmas.filter(t => t.ano === +anoFilter);
-
-  const criar = f => adminCriarTurma({ escola: f.escola, ano: f.ano, nome: f.nome.trim(), turno: f.turno });
-  const salvarEdicao = f => adminEditarTurma(editar.id, { escola: f.escola, ano: f.ano, nome: f.nome.trim(), turno: f.turno });
-  const excluir = async t => {
-    if (t.alunos.length > 0) return alert(`A turma "${t.nome}" tem ${t.alunos.length} aluno(s). Transfira-os antes de excluir.`);
-    if (!window.confirm(`Excluir a turma "${t.nome}"?`)) return;
-    try { await adminExcluirTurma(t.id); } catch (err) { alert(err.message); }
-  };
+  const visiveis = turmas.slice(pagina * tamanho, (pagina + 1) * tamanho);
 
   return (
     <div className="fade-in">
-      <PageHeader title="Turmas" subtitle="Todas as turmas da rede. Filtre por escola ou ano para localizar rapidamente."
-        actions={<button className="btn btn-primary" onClick={() => setNovo(true)}><I name="plus" size={15} />Nova turma</button>} />
+      <PageHeader title="Turmas" subtitle="Turmas sincronizadas automaticamente do SAG (somente leitura). Filtre por escola ou ano para localizar rapidamente." />
       <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
         <select className="input" style={{ maxWidth: 280 }} value={escFilter} onChange={e => setEscFilter(e.target.value)}>
           <option value="todas">Todas as escolas</option>
@@ -161,10 +129,10 @@ export const AdminTurmas = ({ openTurma }) => {
       </div>
       <div className="card">
         <table className="tbl">
-          <thead><tr><th>Turma</th><th>Escola</th><th>Ano</th><th>Turno</th><th style={{ textAlign: 'center' }}>Alunos</th><th style={{ width: 90 }}></th></tr></thead>
+          <thead><tr><th>Turma</th><th>Escola</th><th>Ano</th><th>Turno</th><th style={{ textAlign: 'center' }}>Alunos</th></tr></thead>
           <tbody>
-            {turmas.map(t => (
-              <tr key={t.id} className="clickable" onClick={() => openTurma(t.id)}>
+            {visiveis.map(t => (
+              <tr key={t.id}>
                 <td style={{ fontWeight: 600 }}>{t.nome}</td>
                 <td>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
@@ -175,156 +143,51 @@ export const AdminTurmas = ({ openTurma }) => {
                 <td style={{ color: 'var(--text-2)' }}>{D.anoNome(t.ano)}</td>
                 <td style={{ color: 'var(--text-2)' }}>{t.turno}</td>
                 <td className="num" style={{ textAlign: 'center', fontWeight: 600 }}>{t.alunos.length}</td>
-                <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }} onClick={e => e.stopPropagation()}>
-                  <button className="icon-btn" title="Editar turma" onClick={() => setEditar(t)}><I name="edit" size={15} /></button>
-                  <button className="icon-btn" title="Excluir turma" onClick={() => excluir(t)}><I name="x" size={15} /></button>
-                </td>
               </tr>
             ))}
           </tbody>
         </table>
-      </div>
-      {novo && <TurmaForm titulo="Nova turma" onClose={() => setNovo(false)} onSave={criar}
-        inicial={{ escola: '', nome: '', ano: (D.ANOS[0] || { ordem: 1 }).ordem, turno: 'Matutino' }} />}
-      {editar && <TurmaForm titulo={'Editar — ' + editar.nome} onClose={() => setEditar(null)} onSave={salvarEdicao}
-        inicial={{ escola: editar.escolaId, nome: editar.nome, ano: editar.ano, turno: editar.turno }} />}
-    </div>
-  );
-};
-
-/* -------- Detalhe da turma (roster) -------- */
-export const AdminTurmaDetail = ({ turmaId, back, openAluno }) => {
-  const [t, setT] = useState(null);
-  useEffect(() => {
-    let ativo = true;
-    fetchTurmaFull(turmaId).then(x => { if (ativo) setT(x); }).catch(() => { if (ativo) setT(false); });
-    return () => { ativo = false; };
-  }, [turmaId]);
-  if (t === null) return <Carregando back={back} />;
-  if (t === false) return <Carregando back={back} />;
-  return (
-    <div className="fade-in">
-      <button className="btn btn-subtle btn-sm" style={{ marginBottom: 16 }} onClick={back}><I name="chevL" size={15} />Voltar</button>
-      <div className="card card-pad" style={{ marginBottom: 18, display: 'flex', alignItems: 'center', gap: 16 }}>
-        <div style={{ width: 52, height: 52, borderRadius: 13, background: t.escolaCor + '18', color: t.escolaCor, display: 'grid', placeItems: 'center', flex: 'none' }}><I name="grid" size={24} /></div>
-        <div style={{ flex: 1 }}>
-          <h2 style={{ fontSize: 21 }}>{t.nome}</h2>
-          <div style={{ display: 'flex', gap: 8, marginTop: 7, flexWrap: 'wrap' }}>
-            <span className="chip"><I name="school" size={13} />{t.escolaNome}</span>
-            <span className="chip">{t.turno}</span>
-            <span className="chip"><I name="users" size={13} />{t.alunos.length} alunos</span>
-          </div>
-        </div>
-      </div>
-      <div className="card">
-        <table className="tbl">
-          <thead><tr><th style={{ width: 40 }}>Nº</th><th>Aluno</th><th></th></tr></thead>
-          <tbody>
-            {t.alunos.map(a => (
-              <tr key={a.id} className="clickable" onClick={() => openAluno(a.id)}>
-                <td className="num" style={{ color: 'var(--text-3)' }}>{String(a.numero).padStart(2, '0')}</td>
-                <td><div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><Avatar nome={a.nome} iniciais={a.iniciais} cor="#64748b" size={30} /><span style={{ fontWeight: 600 }}>{a.nome}</span></div></td>
-                <td style={{ textAlign: 'right' }}><I name="chevR" size={16} style={{ color: 'var(--text-4)' }} /></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <Paginacao total={turmas.length} pagina={pagina} setPagina={setPagina}
+          tamanho={tamanho} setTamanho={setTamanho} rotulo="turmas" />
       </div>
     </div>
   );
 };
 
-/* -------- Formulário de aluno (criar/editar) -------- */
-const AlunoForm = ({ titulo, inicial, turmas, editando, onSave, onClose }) => {
-  const [f, setF] = useState(inicial);
-  const [salvando, setSalvando] = useState(false);
-  const [erro, setErro] = useState(null);
-  const set = (k, v) => setF(x => ({ ...x, [k]: v }));
-  const salvar = async () => {
-    if (!f.nome || f.nome.trim().length < 3) { setErro('Informe o nome completo do aluno.'); return; }
-    if (!f.turma) { setErro('Selecione a turma.'); return; }
-    setSalvando(true); setErro(null);
-    try { await onSave(f); onClose(); } catch (err) { setErro(err.message); setSalvando(false); }
-  };
-  const foot = (
-    <>
-      {erro && <span style={{ color: 'var(--red)', fontWeight: 600, fontSize: 12.5 }}>{erro}</span>}
-      <div style={{ flex: 1 }} />
-      <button className="btn btn-ghost" onClick={onClose}>Cancelar</button>
-      <button className="btn btn-primary" disabled={salvando} onClick={salvar} style={{ opacity: salvando ? .6 : 1 }}><I name="check2" size={15} />{salvando ? 'Salvando…' : 'Salvar'}</button>
-    </>
-  );
-  return (
-    <Modal title={titulo} icon="user" width={460} onClose={onClose} footer={foot}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-        <div>
-          <label className="field-label">Nome completo</label>
-          <input className="input" value={f.nome} onChange={e => set('nome', e.target.value)} placeholder="Ex.: João da Silva" />
-        </div>
-        <div>
-          <label className="field-label">Turma</label>
-          <select className="input" value={f.turma} onChange={e => set('turma', e.target.value)}>
-            <option value="">Selecione…</option>
-            {turmas.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
-          </select>
-        </div>
-        {editando && (
-          <div style={{ maxWidth: 150 }}>
-            <label className="field-label">Número de chamada</label>
-            <input className="input" type="number" min={1} value={f.numero} onChange={e => set('numero', +e.target.value)} />
-          </div>
-        )}
-      </div>
-    </Modal>
-  );
-};
+/* O detalhe da turma (roster) não existe no perfil de rede — o fluxo
+   para nas turmas; alunos ficam apenas no diretório "Alunos". */
 
 /* -------- Diretório de alunos (paginação no servidor) -------- */
-const ALUNOS_POR_PAGINA = 50;
-
-export const AdminAlunos = ({ openAluno }) => {
+export const AdminAlunos = () => {
   const D = DATA;
   const escolas = D.escolasFull();
   const [q, setQ] = useState('');
   const [escFilter, setEscFilter] = useState('todas');
   const [pagina, setPagina] = useState(0);
+  const [tamanho, setTamanho] = useState(50);
   const [dados, setDados] = useState(null); // { total, alunos } · null = carregando
-  const [novo, setNovo] = useState(false);
-  const [editar, setEditar] = useState(null);
-  const turmasOpts = escolas.flatMap(e => e.turmas.map(t => ({ id: t.id, label: e.sigla + ' · ' + t.nome })));
 
   const carregar = () => fetchAlunos({
     busca: q.trim() || undefined,
     escola: escFilter !== 'todas' ? escFilter : undefined,
-    limit: ALUNOS_POR_PAGINA,
-    offset: pagina * ALUNOS_POR_PAGINA,
+    limit: tamanho,
+    offset: pagina * tamanho,
   }).then(setDados).catch(() => setDados({ total: 0, alunos: [] }));
 
-  // busca com debounce; troca de filtro/página recarrega direto
+  // busca com debounce; troca de filtro/página/tamanho recarrega direto
+  // (mantém os dados anteriores na tela durante o refetch — sem piscar)
   useEffect(() => {
-    setDados(null);
     const t = setTimeout(carregar, q ? 300 : 0);
     return () => clearTimeout(t);
-  }, [q, escFilter, pagina]);
+  }, [q, escFilter, pagina, tamanho]);
   useEffect(() => { setPagina(0); }, [q, escFilter]);
 
   const total = dados ? dados.total : 0;
   const alunos = dados ? dados.alunos : [];
-  const totalPaginas = Math.max(1, Math.ceil(total / ALUNOS_POR_PAGINA));
-  const ini = total === 0 ? 0 : pagina * ALUNOS_POR_PAGINA + 1;
-  const fim = Math.min(total, pagina * ALUNOS_POR_PAGINA + alunos.length);
-
-  const criar = async f => { await adminCriarAluno({ nome: f.nome.trim(), turma: f.turma }); carregar(); };
-  const salvarEdicao = async f => { await adminEditarAluno(editar.id, { nome: f.nome.trim(), turma: f.turma, numero: f.numero }); carregar(); };
-  const excluir = async a => {
-    if (!window.confirm(`Excluir o aluno "${a.nome}"? Os registros de avaliação e leitura dele serão removidos.`)) return;
-    try { await adminExcluirAluno(a.id); carregar(); } catch (err) { alert(err.message); }
-  };
 
   return (
     <div className="fade-in">
-      <PageHeader title="Alunos" subtitle="Diretório de estudantes de toda a rede. Busque por nome ou filtre por escola."
-        actions={<button className="btn btn-primary" onClick={() => setNovo(true)}><I name="plus" size={15} />Novo aluno</button>} />
+      <PageHeader title="Alunos" subtitle="Diretório de estudantes sincronizado automaticamente do SAG (somente leitura). Busque por nome ou filtre por escola." />
       <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
         <div style={{ position: 'relative', flex: 1, minWidth: 240 }}>
           <I name="search" size={16} style={{ position: 'absolute', left: 12, top: 11, color: 'var(--text-3)' }} />
@@ -336,14 +199,14 @@ export const AdminAlunos = ({ openAluno }) => {
         </select>
       </div>
       <div className="card">
-        <div style={{ padding: '10px 16px', borderBottom: '1px solid var(--border)', fontSize: 12.5, color: 'var(--text-3)' }}>
-          {dados === null ? 'Carregando…' : <>Mostrando <b className="num">{fmt(ini)}–{fmt(fim)}</b> de <b className="num">{fmt(total)}</b> alunos</>}
-        </div>
+        {dados === null && (
+          <div style={{ padding: '10px 16px', borderBottom: '1px solid var(--border)', fontSize: 12.5, color: 'var(--text-3)' }}>Carregando…</div>
+        )}
         <table className="tbl">
-          <thead><tr><th>Aluno</th><th>Escola</th><th>Turma</th><th style={{ width: 90 }}></th></tr></thead>
+          <thead><tr><th>Aluno</th><th>Escola</th><th>Turma</th></tr></thead>
           <tbody>
             {dados !== null && alunos.length === 0 && (
-              <tr><td colSpan={4} style={{ color: 'var(--text-3)', padding: '18px 16px' }}>Nenhum aluno encontrado.</td></tr>
+              <tr><td colSpan={3} style={{ color: 'var(--text-3)', padding: '18px 16px' }}>Nenhum aluno encontrado.</td></tr>
             )}
             {alunos.map(a => (
               <tr key={a.id}>
@@ -355,65 +218,19 @@ export const AdminAlunos = ({ openAluno }) => {
                   </div>
                 </td>
                 <td style={{ color: 'var(--text-2)' }}>{a.turmaNome}</td>
-                <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }} onClick={e => e.stopPropagation()}>
-                  <button className="icon-btn" title="Editar aluno" onClick={() => setEditar(a)}><I name="edit" size={15} /></button>
-                  <button className="icon-btn" title="Excluir aluno" onClick={() => excluir(a)}><I name="x" size={15} /></button>
-                </td>
               </tr>
             ))}
           </tbody>
         </table>
-        {/* barra de paginação */}
-        <div style={{ padding: '10px 16px', borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 12.5, color: 'var(--text-3)' }}>
-            Página <b className="num">{fmt(pagina + 1)}</b> de <b className="num">{fmt(totalPaginas)}</b>
-          </span>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <button className="btn btn-subtle btn-sm" disabled={pagina === 0} style={{ opacity: pagina === 0 ? .5 : 1 }} onClick={() => setPagina(0)}>« Primeira</button>
-            <button className="btn btn-subtle btn-sm" disabled={pagina === 0} style={{ opacity: pagina === 0 ? .5 : 1 }} onClick={() => setPagina(p => Math.max(0, p - 1))}><I name="chevL" size={14} />Anterior</button>
-            <button className="btn btn-subtle btn-sm" disabled={pagina + 1 >= totalPaginas} style={{ opacity: pagina + 1 >= totalPaginas ? .5 : 1 }} onClick={() => setPagina(p => p + 1)}>Próxima<I name="chevR" size={14} /></button>
-            <button className="btn btn-subtle btn-sm" disabled={pagina + 1 >= totalPaginas} style={{ opacity: pagina + 1 >= totalPaginas ? .5 : 1 }} onClick={() => setPagina(totalPaginas - 1)}>Última »</button>
-          </div>
-        </div>
-      </div>
-      {novo && <AlunoForm titulo="Novo aluno" turmas={turmasOpts} onClose={() => setNovo(false)} onSave={criar}
-        inicial={{ nome: '', turma: '' }} />}
-      {editar && <AlunoForm titulo={'Editar — ' + editar.nome} editando turmas={turmasOpts} onClose={() => setEditar(null)} onSave={salvarEdicao}
-        inicial={{ nome: editar.nome, turma: editar.turma, numero: editar.numero }} />}
-    </div>
-  );
-};
-
-/* -------- Ficha de leitura do aluno (admin) -------- */
-export const AdminAlunoFicha = ({ alunoId, back }) => {
-  const [a, setA] = useState(null);
-  useEffect(() => {
-    let ativo = true;
-    fetchAlunoFull(alunoId).then(x => { if (ativo) setA(x); }).catch(() => { if (ativo) setA(false); });
-    return () => { ativo = false; };
-  }, [alunoId]);
-  if (!a) return <Carregando back={back} />;
-  return (
-    <div className="fade-in">
-      <button className="btn btn-subtle btn-sm" style={{ marginBottom: 16 }} onClick={back}><I name="chevL" size={15} />Voltar</button>
-      <div className="card card-pad" style={{ marginBottom: 18, display: 'flex', alignItems: 'center', gap: 18 }}>
-        <Avatar nome={a.nome} iniciais={a.iniciais} cor="#475569" size={64} />
-        <div style={{ flex: 1 }}>
-          <h2 style={{ fontSize: 22 }}>{a.nome}</h2>
-          <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
-            <span className="chip">Nº {String(a.numero).padStart(2, '0')}</span>
-            <span className="chip"><I name="school" size={13} />{a.escolaNome}</span>
-            <span className="chip"><I name="grid" size={13} />{a.turmaNome} · {a.turno}</span>
-          </div>
-        </div>
-      </div>
-
-      <div className="card card-pad" style={{ color: 'var(--text-3)', fontSize: 13 }}>
-        Acompanhamento por habilidade na Verificação Contínua.
+        <Paginacao total={total} pagina={pagina} setPagina={setPagina}
+          tamanho={tamanho} setTamanho={setTamanho} rotulo="alunos" />
       </div>
     </div>
   );
 };
+
+/* A análise individual de alunos não está disponível no perfil de rede
+   (admin/secretaria) — o acompanhamento é agregado por escola e turma. */
 
 /* -------- Usuários & acessos -------- */
 const UserForm = ({ titulo, inicial, onSave, onClose, editando }) => {

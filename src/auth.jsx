@@ -43,8 +43,11 @@ export const Login = ({ onLogin }) => {
         display: 'flex', flexDirection: 'column', justifyContent: 'space-between', position: 'relative', overflow: 'hidden' }}>
         <div style={{ position: 'absolute', width: 460, height: 460, borderRadius: '50%', background: 'radial-gradient(circle, rgba(5,161,227,.32), transparent 70%)', top: -120, right: -120 }} />
         <div style={{ position: 'relative' }}>
-          <div style={{ background: '#fff', borderRadius: 14, padding: '14px 20px', display: 'inline-flex' }}>
-            <img src="/assets/logo-maximiza.png" alt="maXXimiza — Soluções Educacionais" style={{ height: 46, width: 'auto', display: 'block' }} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            <div style={{ background: '#fff', borderRadius: 14, padding: '14px 20px', display: 'inline-flex' }}>
+              <img src="/assets/logo-maximiza.png" alt="maXXimiza — Soluções Educacionais" style={{ height: 46, width: 'auto', display: 'block' }} />
+            </div>
+            <span style={{ color: '#fff', fontWeight: 800, fontSize: 34, letterSpacing: '-.02em' }}>SAG</span>
           </div>
           <div style={{ fontSize: 12.5, color: '#9fb3d4', marginTop: 12 }}>Plataforma de Gestão Pedagógica · Rede Municipal de Ensino</div>
         </div>

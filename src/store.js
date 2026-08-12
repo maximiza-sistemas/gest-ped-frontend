@@ -174,9 +174,12 @@ export async function hydrateRede() {
 
 /* ---------------- escritas ---------------- */
 
-/** Verificação contínua em lote: { planejamentoId, habCod, data, marks } */
+/** Verificação contínua em lote: { planejamentoId, habCod, turmaId, data, marks, eventoId? }.
+    Sem eventoId cria um evento de acompanhamento; com eventoId CONTINUA o
+    evento (os resultados dos alunos são atualizados, sem duplicar — a data é
+    somente registro). Devolve { avaliacoes, eventoId }. */
 export async function registrarAvaliacaoLote(payload) {
-  await api.post('/avaliacoes/lote', payload);
+  const res = await api.post('/avaliacoes/lote', payload);
   const turmaId = payload.turmaId || (DATA.TURMA_ATUAL && DATA.TURMA_ATUAL.id);
   const [avaliacoes] = await Promise.all([
     api.get('/avaliacoes/turma/' + turmaId),
@@ -189,24 +192,15 @@ export async function registrarAvaliacaoLote(payload) {
   }
   DATA.TIMELINE = await api.get('/timeline?limit=30');
   notify();
-  return avaliacoes; // a tela usa para atualizar a turma selecionada
+  return { avaliacoes, eventoId: res.eventoId };
 }
 
-/** Exclui uma verificação (sessão turma + habilidade + data); devolve as avaliações atualizadas da turma */
-export async function excluirVerificacao({ habCod, turmaId, data, planejamentoId }) {
-  await api.delete(`/avaliacoes/sessao?hab=${encodeURIComponent(habCod)}&turma=${encodeURIComponent(turmaId)}&data=${encodeURIComponent(data)}`);
-  const [avaliacoes] = await Promise.all([
-    api.get('/avaliacoes/turma/' + turmaId),
-    planejamentoId ? hydratePlano(planejamentoId) : Promise.resolve(),
-  ]);
-  if (turmaId === (DATA.TURMA_ATUAL && DATA.TURMA_ATUAL.id)) {
-    DATA.AVALIACOES = avaliacoes;
-    (DATA.alunosT1 || []).forEach(a => { if (!DATA.AVALIACOES[a.id]) DATA.AVALIACOES[a.id] = {}; });
-  }
-  DATA.TIMELINE = await api.get('/timeline?limit=30');
-  notify();
-  return avaliacoes;
-}
+/** Eventos de acompanhamento da turma: [{ id, habCod, data, atualizadoEm, avaliados, atingiram }] */
+export const fetchEventosTurma = turmaId => api.get('/avaliacoes/eventos?turma=' + encodeURIComponent(turmaId));
+
+/** Marcas atuais de um evento (para completar em outro dia): { ..., marks: {alunoId: 1|2} } */
+export const fetchEvento = id => api.get('/avaliacoes/evento/' + id);
+// eventos de acompanhamento são imutáveis após a análise — sem edição/exclusão
 
 /** Atividades/recursos/status de uma habilidade do planejamento */
 export async function salvarTrabalho(planejamentoId, habCod, payload) {
@@ -383,21 +377,7 @@ export async function excluirAno(ordem) {
   notify();
 }
 
-/* ---------------- escolas / turmas / alunos — admin/secretaria ---------------- */
-// recarrega rede (escolas+turmas+alunos agregados) e meta (lista de escolas)
-async function refreshRede() {
-  await Promise.all([hydrateRede(), hydrateMeta()]);
-  notify();
-}
-export async function adminCriarEscola(payload) { const e = await api.post('/admin/escolas', payload); await refreshRede(); return e; }
-export async function adminEditarEscola(id, payload) { const e = await api.patch('/admin/escolas/' + id, payload); await refreshRede(); return e; }
-export async function adminExcluirEscola(id) { await api.delete('/admin/escolas/' + id); await refreshRede(); }
-export async function adminCriarTurma(payload) { const t = await api.post('/admin/turmas', payload); await refreshRede(); return t; }
-export async function adminEditarTurma(id, payload) { const t = await api.patch('/admin/turmas/' + id, payload); await refreshRede(); return t; }
-export async function adminExcluirTurma(id) { await api.delete('/admin/turmas/' + id); await refreshRede(); }
-export async function adminCriarAluno(payload) { const a = await api.post('/admin/alunos', payload); await refreshRede(); return a; }
-export async function adminEditarAluno(id, payload) { const a = await api.patch('/admin/alunos/' + id, payload); await refreshRede(); return a; }
-export async function adminExcluirAluno(id) { await api.delete('/admin/alunos/' + id); await refreshRede(); }
+/* escolas/turmas/alunos são espelhados do SAG — somente leitura (sem CRUD local) */
 
 /* fetch lazy usados nas fichas/drill-down */
 export const fetchAlunoFull = id => api.get('/alunos/' + id + '/full');
