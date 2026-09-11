@@ -1,73 +1,98 @@
 /* ============================================================
    Gestor (parte 3) — Professores & turmas, Períodos avaliativos
    ============================================================ */
-import React from 'react';
-import { DATA } from './data.js';
+import React, { useState, useEffect } from 'react';
+import { DATA, fetchProfessoresResumo } from './store.js';
 import { PageHeader, I, Avatar, Bar } from './ui.jsx';
 
-/* -------- Professores & turmas -------- */
+/* -------- Professores & turmas (dados reais de GET /professores/resumo) -------- */
 export const ProfessoresTurmas = ({ openAluno }) => {
   const D = DATA;
-  const progresso = { p1: 67, p2: 50, p3: 33 };
-  const avals = { p1: 10, p2: 6, p3: 3 };
+  const [resumo, setResumo] = useState(null); // null = carregando
+  const [erro, setErro] = useState(null);
+  useEffect(() => {
+    let ativo = true;
+    fetchProfessoresResumo()
+      .then(r => { if (ativo) setResumo(r || []); })
+      .catch(err => { if (ativo) { setErro(err.message); setResumo([]); } });
+    return () => { ativo = false; };
+  }, []);
+
+  const corProgresso = pct => (pct >= 70 ? '#15935f' : pct >= 40 ? '#c77a07' : '#d3433a');
+
   return (
     <div className="fade-in">
-      <PageHeader title="Professores & turmas" subtitle="Acompanhe o trabalho de cada professor: habilidades trabalhadas, avaliações realizadas e regularidade." />
+      <PageHeader title="Professores & turmas" subtitle="Acompanhe o trabalho de cada professor: habilidades direcionadas já verificadas, avaliações registradas e alunos avaliados." />
       <div className="card" style={{ marginBottom: 18 }}>
-        <table className="tbl">
-          <thead><tr><th>Professor</th><th>Componente</th><th>Turma</th><th>Progresso</th><th style={{ textAlign: 'center' }}>Avaliações</th><th></th></tr></thead>
-          <tbody>
-            {D.PROFESSORES.map(p => {
-              const pl = D.PLANEJAMENTOS.find(x => x.prof === p.id);
-              return (
-                <tr key={p.id} className="clickable">
+        {resumo === null && <div style={{ padding: '18px 22px', color: 'var(--text-3)', fontSize: 13 }}>Carregando…</div>}
+        {erro && <div style={{ padding: '14px 22px', color: 'var(--red)', fontWeight: 600, fontSize: 13 }}>{erro}</div>}
+        {resumo !== null && (
+          <table className="tbl">
+            <thead><tr>
+              <th>Professor</th><th>Componente</th><th>Turmas</th>
+              <th>Habilidades direcionadas verificadas</th>
+              <th style={{ textAlign: 'center' }}>Avaliações</th>
+              <th>Última avaliação</th>
+            </tr></thead>
+            <tbody>
+              {resumo.length === 0 && (
+                <tr><td colSpan={6} style={{ color: 'var(--text-3)', padding: '18px 16px' }}>Nenhum professor com turmas no seu escopo.</td></tr>
+              )}
+              {resumo.map(p => (
+                <tr key={p.id}>
                   <td>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <Avatar {...p} size={34} />
+                      <Avatar nome={p.nome} iniciais={p.iniciais} cor={p.cor} size={34} />
                       <span style={{ fontWeight: 600 }}>{p.nome}</span>
                     </div>
                   </td>
-                  <td><span className={'badge ' + (p.comp === 'lp' ? 'badge-blue' : 'badge-gray')} style={p.comp !== 'lp' ? { background: 'var(--violet-bg)', color: 'var(--violet)' } : {}}>{D.compNome(p.comp)}</span></td>
-                  <td style={{ color: 'var(--text-2)' }}>{pl ? D.turmaNome(pl.turma) : '—'}</td>
-                  <td style={{ minWidth: 180 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <div style={{ flex: 1 }}><Bar value={progresso[p.id]} color={p.cor} /></div>
-                      <span className="num" style={{ fontWeight: 700, fontSize: 12.5, width: 34 }}>{progresso[p.id]}%</span>
-                    </div>
+                  <td><span className="badge badge-blue">{D.compNome(p.comp)}</span></td>
+                  <td style={{ color: 'var(--text-2)', fontSize: 13 }}>
+                    {p.turmas.length === 0 ? '—' : p.turmas.map(t => (
+                      <div key={t.id}>{t.nome} <span style={{ color: 'var(--text-4)', fontSize: 11.5 }}>· {t.escolaNome} · {t.alunos} alunos</span></div>
+                    ))}
                   </td>
-                  <td style={{ textAlign: 'center' }}><span className="num" style={{ fontWeight: 700 }}>{avals[p.id]}</span></td>
-                  <td style={{ textAlign: 'right' }}><I name="chevR" size={16} style={{ color: 'var(--text-4)' }} /></td>
+                  <td style={{ minWidth: 200 }}>
+                    {p.progresso == null ? (
+                      <span style={{ fontSize: 12, color: 'var(--text-4)' }}>Sem habilidades direcionadas</span>
+                    ) : (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <div style={{ flex: 1 }}><Bar value={p.progresso} color={corProgresso(p.progresso)} /></div>
+                        <span className="num" style={{ fontWeight: 700, fontSize: 12.5, whiteSpace: 'nowrap' }}>{p.habilidadesTrabalhadas}/{p.habilidadesDirecionadas} · {p.progresso}%</span>
+                      </div>
+                    )}
+                  </td>
+                  <td style={{ textAlign: 'center' }}>
+                    <span className="num" style={{ fontWeight: 700 }}>{p.avaliacoes}</span>
+                    <div style={{ fontSize: 11, color: 'var(--text-4)' }}>{p.alunosAvaliados} aluno{p.alunosAvaliados === 1 ? '' : 's'}</div>
+                  </td>
+                  <td className="num" style={{ color: 'var(--text-2)', fontSize: 12.5 }}>{p.ultimaAvaliacao || '—'}</td>
                 </tr>
-              );
-            })}
-          </tbody>
-        </table>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
 
-      <h3 style={{ fontSize: 15, marginBottom: 12 }}>Alunos · {D.TURMA_ATUAL?.nome || 'turma'}{D.TURMA_ATUAL?.escolaNome ? ' · ' + D.TURMA_ATUAL.escolaNome : ''}</h3>
+      <h3 style={{ fontSize: 15, marginBottom: 12 }}>Alunos · {D.TURMA_ATUAL?.nome || 'turma'}{D.TURMA_ATUAL?.escolaNome ? ' · ' + D.TURMA_ATUAL.escolaNome : ''} · {D.alunosT1.length}</h3>
       <div className="card">
         <table className="tbl">
           <thead><tr><th style={{ width: 40 }}>Nº</th><th>Aluno</th><th></th></tr></thead>
           <tbody>
-            {D.alunosT1.slice(0, 8).map(a => {
-              return (
-                <tr key={a.id} className="clickable" onClick={() => openAluno(a.id)}>
-                  <td className="num" style={{ color: 'var(--text-3)' }}>{String(a.numero).padStart(2, '0')}</td>
-                  <td>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <Avatar nome={a.nome} iniciais={a.iniciais} cor="#64748b" size={30} />
-                      <span style={{ fontWeight: 600 }}>{a.nome}</span>
-                    </div>
-                  </td>
-                  <td style={{ textAlign: 'right' }}><I name="chevR" size={16} style={{ color: 'var(--text-4)' }} /></td>
-                </tr>
-              );
-            })}
+            {D.alunosT1.map(a => (
+              <tr key={a.id} className="clickable" onClick={() => openAluno(a.id)}>
+                <td className="num" style={{ color: 'var(--text-3)' }}>{String(a.numero).padStart(2, '0')}</td>
+                <td>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <Avatar nome={a.nome} iniciais={a.iniciais} cor="#64748b" size={30} />
+                    <span style={{ fontWeight: 600 }}>{a.nome}</span>
+                  </div>
+                </td>
+                <td style={{ textAlign: 'right' }}><I name="chevR" size={16} style={{ color: 'var(--text-4)' }} /></td>
+              </tr>
+            ))}
           </tbody>
         </table>
-        <div style={{ padding: '12px 22px', textAlign: 'center', borderTop: '1px solid var(--border)' }}>
-          <button className="btn btn-subtle btn-sm">Ver todos os {D.alunosT1.length} alunos</button>
-        </div>
       </div>
     </div>
   );

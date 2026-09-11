@@ -4,7 +4,7 @@
 import React, { useState } from 'react';
 import { DATA } from './data.js';
 import { PageHeader, I, Stat, Bar, VBars, MatrizBadge, Avatar, InfoDica } from './ui.jsx';
-import { NovoPlanejamento } from './gestor2.jsx';
+import { NovoPlanejamento, confirmarExclusaoPlanejamento } from './gestor2.jsx';
 import { excluirPlanejamento } from './store.js';
 import { EvolucaoEscopo } from './evolucao.jsx';
 
@@ -86,10 +86,7 @@ export const Planejamentos = ({ go, openPlan, periodoInicial }) => {
   const lista = D.PLANEJAMENTOS.filter(pl => casaMes(pl, periodoSel) && casaEscola(pl, escolaSel) && casaAno(pl, anoSel));
   const anosTxt = pl => pl.anos && pl.anos.length ? pl.anos.map(a => D.anoNome(a)).join(', ') : 'Todas as séries';
   const statusBadge = s => s === 'ativo' ? ['badge-green', 'Ativo'] : s === 'arquivado' ? ['badge-gray', 'Arquivado'] : ['badge-blue', 'Concluído'];
-  const excluir = async pl => {
-    if (!window.confirm(`Excluir o planejamento "${pl.titulo}"?\n\nAs habilidades vinculadas, as sequências didáticas semanais dos professores e os registros de verificação contínua deste planejamento serão removidos. Esta ação não pode ser desfeita.`)) return;
-    try { await excluirPlanejamento(pl.id); } catch (err) { alert(err.message); }
-  };
+  const excluir = pl => confirmarExclusaoPlanejamento(pl);
 
   return (
     <div className="fade-in">

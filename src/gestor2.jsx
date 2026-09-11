@@ -5,6 +5,22 @@
 import React, { useState, useEffect } from 'react';
 import { DATA, criarPlanejamento, atualizarPlanejamento, excluirPlanejamento, hydratePlano, fetchTurmas, criarHabilidade } from './store.js';
 import { Modal, I, MatrizBadge, Avatar, PageHeader } from './ui.jsx';
+import { confirmar } from './dialogo.jsx';
+
+/* Exclusão de planejamento — mesma confirmação na lista e no detalhe.
+   Resolve true quando a exclusão foi concluída (erros ficam no diálogo). */
+export const confirmarExclusaoPlanejamento = pl => confirmar({
+  titulo: `Excluir o planejamento "${pl.titulo}"?`,
+  mensagem: 'Tudo o que foi produzido a partir deste planejamento será removido junto com ele.',
+  detalhes: [
+    'Habilidades vinculadas ao planejamento',
+    'Sequências didáticas semanais dos professores',
+    'Registros de verificação contínua dos alunos',
+  ],
+  perigo: true,
+  textoConfirmar: 'Excluir planejamento',
+  aoConfirmar: () => excluirPlanejamento(pl.id),
+});
 
 /* -------- Wizard: novo / editar planejamento -------- */
 export const NovoPlanejamento = ({ onClose, plano }) => {
@@ -29,7 +45,7 @@ export const NovoPlanejamento = ({ onClose, plano }) => {
   const toggleHab = c => set('habs', form.habs.includes(c) ? form.habs.filter(x => x !== c) : [...form.habs, c]);
   const toggleAno = a => set('anos', form.anos.includes(a) ? form.anos.filter(x => x !== a) : [...form.anos, a]);
   const toggleGrupo = id => set('grupos', form.grupos.includes(id) ? form.grupos.filter(x => x !== id) : [...form.grupos, id]);
-  const steps = ['Mês e expectativa', 'Habilidades direcionadas'];
+  const steps = ['Mês, séries e grupos', 'Habilidades direcionadas'];
 
   const podeAvancar = step === 1 ? (form.titulo.trim().length >= 3 && !!form.periodo) : form.habs.length > 0;
 
@@ -119,10 +135,8 @@ export const NovoPlanejamento = ({ onClose, plano }) => {
               })}
             </div>
           </div>
-          <div>
-            <label className="field-label">Expectativa de aprendizagem</label>
-            <textarea className="input" rows={4} placeholder="Descreva a expectativa de aprendizagem direcionada para o mês…" value={form.objetivo} onChange={e => set('objetivo', e.target.value)} style={{ resize: 'vertical' }} />
-          </div>
+          {/* a expectativa de aprendizagem é definida pelo professor, por habilidade
+              verificada, no Meu planejamento — a Secretaria só direciona as habilidades */}
         </div>
       )}
 
@@ -194,8 +208,18 @@ export const SemanaCard = ({ s }) => {
         {s.atualizadoEm && <span style={{ fontSize: 11, color: 'var(--text-4)', marginLeft: 'auto' }}>atualizada em {s.atualizadoEm}</span>}
       </div>
       {habs.length > 0 && (
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: campos.length ? 10 : 0 }}>
-          {habs.map(c => <span key={c} className="code-pill" title={(DATA.habByCod[c] || {}).desc}>{DATA.rotulo(c)}</span>)}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: campos.length ? 10 : 0 }}>
+          {habs.map(c => {
+            const exp = (s.expectativas || {})[c]; // expectativa de aprendizagem definida pelo professor
+            return (
+              <div key={c} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                <span className="code-pill" title={(DATA.habByCod[c] || {}).desc} style={{ flex: 'none' }}>{DATA.rotulo(c)}</span>
+                <span style={{ fontSize: 12.5, color: exp ? 'var(--text-2)' : 'var(--text-4)', lineHeight: 1.4 }}>
+                  {exp ? <><b>Expectativa de aprendizagem:</b> {exp}</> : 'Sem expectativa de aprendizagem definida pelo professor'}
+                </span>
+              </div>
+            );
+          })}
         </div>
       )}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -282,7 +306,6 @@ const ProfSemanas = ({ profId, turmasRede }) => {
 export const PlanDetail = ({ planId, back }) => {
   const D = DATA;
   const [editando, setEditando] = useState(false);
-  const [excluindo, setExcluindo] = useState(false);
   // turmas da rede toda — resolve escola/ano dos professores (D.TURMAS só tem a escola padrão)
   const [turmasRede, setTurmasRede] = useState(DATA.TURMAS);
   useEffect(() => {
@@ -294,10 +317,8 @@ export const PlanDetail = ({ planId, back }) => {
   if (!pl) return <div className="card card-pad" style={{ color: 'var(--text-3)' }}>Planejamento não encontrado.</div>;
   const podeEditar = ['admin', 'secretaria'].includes(D.CURRENT_USER?.perfil);
   const excluir = async () => {
-    if (!window.confirm(`Excluir o planejamento "${pl.titulo}"?\n\nAs habilidades vinculadas, as sequências didáticas semanais dos professores e os registros de verificação contínua deste planejamento serão removidos. Esta ação não pode ser desfeita.`)) return;
-    setExcluindo(true);
-    try { await excluirPlanejamento(pl.id); back(); }
-    catch (err) { alert(err.message); setExcluindo(false); }
+    const ok = await confirmarExclusaoPlanejamento(pl);
+    if (ok) back();
   };
   const trab = D.TRABALHO[pl.id] || {};
   const semanas = D.SEMANAS[pl.id] || [];
@@ -316,7 +337,7 @@ export const PlanDetail = ({ planId, back }) => {
         actions={podeEditar && (
           <>
             <button className="btn btn-subtle" onClick={() => setEditando(true)}><I name="edit" size={15} />Editar</button>
-            <button className="btn btn-subtle" onClick={excluir} disabled={excluindo} style={{ color: 'var(--red)' }}><I name="x" size={15} />{excluindo ? 'Excluindo…' : 'Excluir'}</button>
+            <button className="btn btn-subtle" onClick={excluir} style={{ color: 'var(--red)' }}><I name="trash" size={15} />Excluir</button>
           </>
         )}
       />

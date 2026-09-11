@@ -213,7 +213,6 @@ export const TabelaAlunos = ({ alunos, titulo, sub, multiTurma, turmaNome, onAlu
             {multiTurma && <th>Turma</th>}
             <th style={{ textAlign: 'center' }}>Avaliações</th>
             <th>% de atingimento</th>
-            <th style={{ textAlign: 'center' }}>Leitura</th>
           </tr></thead>
           <tbody>
             {visiveis.map(a => (
@@ -228,11 +227,10 @@ export const TabelaAlunos = ({ alunos, titulo, sub, multiTurma, turmaNome, onAlu
                 {multiTurma && <td style={{ fontSize: 12.5, color: 'var(--text-2)' }}>{turmaNome ? turmaNome(a.turmaId) : a.turmaId}</td>}
                 <td className="num" style={{ textAlign: 'center', fontWeight: 600 }}>{a.avaliacoes}</td>
                 <td><CelPct v={a.pctAtingiu} /></td>
-                <td style={{ textAlign: 'center' }}><span className="badge badge-blue num">Nv {a.nivelLeitura}</span></td>
               </tr>
             ))}
             {!visiveis.length && (
-              <tr><td colSpan={multiTurma ? 6 : 5} style={{ textAlign: 'center', color: 'var(--text-3)', padding: 22 }}>Nenhum aluno no filtro.</td></tr>
+              <tr><td colSpan={multiTurma ? 5 : 4} style={{ textAlign: 'center', color: 'var(--text-3)', padding: 22 }}>Nenhum aluno no filtro.</td></tr>
             )}
           </tbody>
         </table>
@@ -614,7 +612,7 @@ export const EvolucaoProfessor = ({ openAluno, embutido = false }) => {
           multiTurma={multi}
           turmaNome={turmaNomeDe}
           onAluno={openAluno}
-          info="Para cada aluno: nº de verificações registradas, % de atingimento acumulado e nível de leitura atual."
+          info="Para cada aluno: nº de verificações registradas e % de atingimento acumulado."
         />
       )}
 

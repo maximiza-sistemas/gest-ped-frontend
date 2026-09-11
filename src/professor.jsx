@@ -4,17 +4,19 @@
 import React, { useState, useEffect } from 'react';
 import { DATA, registrarAvaliacaoLote, fetchTurmaFull, fetchAvaliacoesTurma, fetchEventosTurma, fetchEvento } from './store.js';
 import { PageHeader, Stat, I, MatrizBadge, Bar, Avatar, ICONS } from './ui.jsx';
+import { avisar } from './dialogo.jsx';
 import { EvolucaoProfessor } from './evolucao.jsx';
 
 // ícone lock extra (registrado no catálogo compartilhado de ícones)
 ICONS.lock = ['M19 11H5a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2z', 'M7 11V7a5 5 0 0 1 10 0v4'];
 
 // Planos ativos direcionados AO PROFESSOR LOGADO (opcionalmente de um mês):
-// casam pelo componente curricular e pela escola (grupos do plano × grupo da
-// escola das turmas do professor). Campo vazio no plano = vale para todos.
-// A(s) série(s) do plano são informativas (exibidas nos chips) e não
-// restringem o professor. Regra única usada no painel, na verificação
-// contínua e no Meu planejamento.
+// casam pelo componente curricular, pelo grupo de escolas (grupos do plano ×
+// grupo da escola das turmas do professor) E pelo ano escolar (anos do plano ×
+// ano das turmas dele). Campo vazio no plano = vale para todos; turma de
+// habilidades (ano 0) recebe qualquer ano. Espelha planoDirecionadoAoProfessor()
+// do backend. Regra única usada no painel, na verificação contínua, no Meu
+// planejamento e no badge do menu.
 export const planosDirecionados = mes => {
   const D = DATA;
   const prof = D.PROFESSORES.find(p => p.id === D.CURRENT_USER?.profId);
@@ -23,10 +25,14 @@ export const planosDirecionados = mes => {
   const turmas = (prof?.turmaIds || []).map(id => (D.TURMAS || []).find(t => t.id === id)).filter(Boolean);
   const temTurmas = turmas.length > 0;
   const meusGrupos = new Set(turmas.map(t => ((D.ESCOLAS || []).find(e => e.id === t.escola) || {}).grupoId).filter(Boolean));
+  // anos escolares das turmas do professor; ano 0 (turma de habilidades) recebe qualquer direcionamento
+  const meusAnos = new Set(turmas.map(t => t.ano));
+  const casaAno = pl => !temTurmas || !(pl.anos || []).length || meusAnos.has(0) || pl.anos.some(a => meusAnos.has(a));
   return D.PLANEJAMENTOS.filter(pl => pl.status === 'ativo'
     && (mes ? pl.periodo === mes : true)
     && pl.habilidades.some(doComp)
-    && (!temTurmas || !(pl.grupos || []).length || pl.grupos.some(g => meusGrupos.has(g.id))));
+    && (!temTurmas || !(pl.grupos || []).length || pl.grupos.some(g => meusGrupos.has(g.id)))
+    && casaAno(pl));
 };
 
 /* -------- Meu painel -------- */
@@ -330,7 +336,7 @@ export const VerificacaoContinua = ({ openAluno }) => {
       setSaved(false);
       setErro(null);
       window.scrollTo({ top: 0, behavior: 'smooth' });
-    } catch (err) { alert(err.message); }
+    } catch (err) { avisar({ titulo: 'Não foi possível abrir o evento', mensagem: err.message, tipo: 'erro' }); }
   };
 
   // criação explícita de um novo evento (comparativo): limpa a grade, não

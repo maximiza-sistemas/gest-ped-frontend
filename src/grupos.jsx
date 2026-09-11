@@ -6,6 +6,7 @@
 import React, { useState } from 'react';
 import { DATA, criarGrupo, atualizarGrupo, excluirGrupo, moverEscola } from './store.js';
 import { PageHeader, Modal, Stat, I } from './ui.jsx';
+import { confirmar } from './dialogo.jsx';
 
 const PALETA = ['#2563eb', '#6d4bd1', '#0e8aa8', '#15935f', '#c77a07', '#d3433a', '#0e7490', '#475569'];
 
@@ -27,13 +28,15 @@ const EscolaChip = ({ escola, cor, onClick }) => (
 
 /* -------- card de um grupo -------- */
 const GrupoCard = ({ grupo, onEdit, onMove }) => {
-  const excluir = async () => {
-    const msg = grupo.escolas.length
-      ? `Excluir o grupo "${grupo.nome}"? As ${grupo.escolas.length} escola(s) ficarão sem grupo.`
-      : `Excluir o grupo "${grupo.nome}"?`;
-    if (!window.confirm(msg)) return;
-    try { await excluirGrupo(grupo.id); } catch (err) { alert(err.message); }
-  };
+  const excluir = () => confirmar({
+    titulo: `Excluir o grupo "${grupo.nome}"?`,
+    mensagem: grupo.escolas.length
+      ? `As ${grupo.escolas.length} escola(s) deste grupo ficarão sem grupo até serem reorganizadas.`
+      : 'O grupo será removido da organização da rede.',
+    perigo: true,
+    textoConfirmar: 'Excluir grupo',
+    aoConfirmar: () => excluirGrupo(grupo.id),
+  });
   return (
     <div className="card">
       <div className="card-pad" style={{ display: 'flex', alignItems: 'center', gap: 12, borderBottom: grupo.escolas.length ? '1px solid var(--border)' : 'none' }}>

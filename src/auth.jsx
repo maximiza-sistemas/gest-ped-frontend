@@ -13,15 +13,18 @@ const PERFIS = [
   { id: 'admin', nome: 'Administrador', desc: 'Configura a plataforma e gerencia acessos.', icon: 'settings', email: 'sergio@rededeensino.edu.br' },
 ];
 
+// atalhos de demonstração (e-mail/senha preenchidos) só no build de desenvolvimento
+const DEMO = import.meta.env.DEV;
+
 export const Login = ({ onLogin }) => {
   const [perfil, setPerfil] = useState('secretaria');
-  const [email, setEmail] = useState(PERFIS[0].email);
-  const [senha, setSenha] = useState('demo123');
+  const [email, setEmail] = useState(DEMO ? PERFIS[0].email : '');
+  const [senha, setSenha] = useState(DEMO ? 'demo123' : '');
   const [lembrar, setLembrar] = useState(true); // sessão longa: acesso direto na volta
   const [erro, setErro] = useState(null);
   const [carregando, setCarregando] = useState(false);
 
-  const selecionar = p => { setPerfil(p.id); setEmail(p.email); setErro(null); };
+  const selecionar = p => { setPerfil(p.id); if (DEMO) setEmail(p.email); setErro(null); };
 
   const entrar = async e => {
     e.preventDefault();
@@ -113,9 +116,11 @@ export const Login = ({ onLogin }) => {
           <button type="submit" className="btn btn-primary" disabled={carregando} style={{ width: '100%', padding: '12px', opacity: carregando ? .7 : 1 }}>
             {carregando ? 'Entrando…' : <>Entrar como {PERFIS.find(p => p.id === perfil).nome}<I name="chevR" size={16} /></>}
           </button>
-          <p style={{ fontSize: 11.5, color: 'var(--text-4)', textAlign: 'center', marginTop: 18 }}>
-            Acesso demo · senha <b>demo123</b> para todos os perfis
-          </p>
+          {DEMO && (
+            <p style={{ fontSize: 11.5, color: 'var(--text-4)', textAlign: 'center', marginTop: 18 }}>
+              Ambiente de desenvolvimento · senha <b>demo123</b> para os perfis de demonstração
+            </p>
+          )}
         </form>
       </div>
     </div>

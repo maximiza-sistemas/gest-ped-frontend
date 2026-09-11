@@ -4,6 +4,11 @@
 import React, { useState } from 'react';
 import { DATA, login } from './store.js';
 import { I, Avatar } from './ui.jsx';
+import { avisar } from './dialogo.jsx';
+import { planosDirecionados } from './professor.jsx';
+
+// recursos de demonstração (atalhos de login/troca de perfil) só existem no build de desenvolvimento
+const DEMO = import.meta.env.DEV;
 
 // Rótulos amigáveis dos 4 perfis (a chave no banco continua curta)
 export const PERFIL_LABEL = {
@@ -25,7 +30,13 @@ const escopoLabel = (user, D) => {
     if (ids.length > 1) return ids.length + ' escolas';
     return 'Sem escolas vinculadas';
   }
-  return D.ESCOLA.nome;
+  // professor: escola(s) derivada(s) das turmas em que leciona (dados reais, não configuração fixa)
+  const prof = (D.PROFESSORES || []).find(p => p.id === D.CURRENT_USER?.profId);
+  const minhasTurmas = (prof?.turmaIds || []).map(id => (D.TURMAS || []).find(t => t.id === id)).filter(Boolean);
+  const escolasProf = [...new Set(minhasTurmas.map(t => t.escola).filter(Boolean))];
+  if (escolasProf.length === 1) return D.escolaNome(escolasProf[0]);
+  if (escolasProf.length > 1) return escolasProf.length + ' escolas';
+  return D.ESCOLA.nome || 'Sem turmas vinculadas';
 };
 
 const NAV = {
@@ -34,7 +45,7 @@ const NAV = {
       { id: 'dashboard', label: 'Dashboard', icon: 'dashboard' },
     ]},
     { grupo: 'Planejamento', itens: [
-      { id: 'planejamentos', label: 'Planejamentos', icon: 'plan', badge: '3' },
+      { id: 'planejamentos', label: 'Planejamentos', icon: 'plan', badge: D => D.PLANEJAMENTOS.filter(pl => pl.status === 'ativo').length },
     ]},
     { grupo: 'Acompanhamento', itens: [
       { id: 'professores', label: 'Professores & turmas', icon: 'users' },
@@ -47,7 +58,11 @@ const NAV = {
   professor: [
     { grupo: 'Meu trabalho', itens: [
       { id: 'painel', label: 'Dashboard', icon: 'dashboard' },
-      { id: 'verificacao', label: 'Verificação contínua', icon: 'check', badge: '4' },
+      // habilidades direcionadas ao professor no período atual
+      { id: 'verificacao', label: 'Verificação contínua', icon: 'check', badge: D => {
+        const mes = (D.PERIODOS.find(p => p.atual) || {}).id;
+        return new Set(planosDirecionados(mes).flatMap(pl => pl.habilidades)).size;
+      } },
       // 'Níveis de leitura' removido do menu provisoriamente (discussão futura) — rota mantida
     ]},
     { grupo: 'Turma', itens: [
@@ -62,17 +77,13 @@ const NAV = {
     { grupo: 'Rede', itens: [
       { id: 'admrede', label: 'Dashboard', icon: 'dashboard' },
       { id: 'admgrupos', label: 'Grupos de escolas', icon: 'layers' },
-      { id: 'cadastro', label: 'Cadastro', icon: 'folder', children: [
-        { id: 'admescolas', label: 'Escolas', icon: 'school', badge: '6' },
-        { id: 'admanos', label: 'Anos escolares', icon: 'grad' },
-        { id: 'admcomponentes', label: 'Componentes curriculares', icon: 'book' },
-        { id: 'admturmas', label: 'Turmas', icon: 'grid' },
-        { id: 'admalunos', label: 'Alunos', icon: 'users' },
-      ]},
+      // escolas, turmas, alunos e anos escolares vêm do espelho do SAG (somente consulta,
+      // pelo dashboard) — não há cadastro; o único catálogo editável é o de componentes
     ]},
     { grupo: 'Pedagógico', itens: [
       { id: 'planejamentos', label: 'Planejamentos', icon: 'plan' },
       { id: 'habilidades', label: 'Matrizes & habilidades', icon: 'skills' },
+      { id: 'admcomponentes', label: 'Componentes curriculares', icon: 'book' },
     ]},
     { grupo: 'Sistema', itens: [
       { id: 'admusers', label: 'Usuários & acessos', icon: 'user' },
@@ -93,18 +104,21 @@ const TITLES = {
   periodos: ['Períodos avaliativos', 'Períodos avaliativos do ano letivo'],
   painel: ['Dashboard', 'Habilidades direcionadas e evolução das suas turmas e alunos'],
   verificacao: ['Verificação contínua', 'Registre o desempenho individual dos alunos'],
-  alunos: ['Meus alunos', 'Turma 1º Ano A · 24 alunos'],
+  alunos: D => ['Meus alunos', D.TURMA_ATUAL ? `${D.TURMA_ATUAL.nome} · ${(D.alunosT1 || []).length} alunos` : 'Alunos das suas turmas'],
   planoprof: ['Meu planejamento', 'Edite atividades e estratégias do planejamento recebido'],
   admrede: ['Dashboard', 'Indicadores e evolução da rede de ensino'],
   admescolas: ['Escolas', 'Unidades escolares da rede municipal'],
   admgrupos: ['Grupos de escolas', 'Organize as escolas da rede em grupos (polos)'],
-  admanos: ['Anos escolares', 'Séries usadas para direcionar os planejamentos'],
   admcomponentes: ['Componentes curriculares', 'Disciplinas usadas nas habilidades, professores e planejamentos'],
-  admturmas: ['Turmas', 'Todas as turmas da rede, por escola e ano'],
-  admalunos: ['Alunos', 'Diretório de estudantes da rede'],
   admusers: ['Usuários & acessos', 'Gestão de contas e permissões'],
   admconfig: ['Configurações', 'Parâmetros gerais do sistema'],
   sag: ['Resultado avaliações', 'Resultados das avaliações — aplicação integrada da maXXimiza'],
+};
+
+// badge do menu calculado dos dados hidratados (nunca um número fixo); some quando é zero
+const NavBadge = ({ badge }) => {
+  const n = typeof badge === 'function' ? badge(DATA) : badge;
+  return n ? <span className="nav-badge num">{n}</span> : null;
 };
 
 // item de menu expansível (ex.: Cadastro) — abre sozinho quando a rota ativa é de um submenu
@@ -123,7 +137,7 @@ const NavGrupo = ({ item, route, setRoute, onClose }) => {
         <button key={c.id} className={'nav-item sub' + (route === c.id ? ' active' : '')} onClick={() => { setRoute(c.id); onClose?.(); }}>
           <I name={c.icon} size={16} />
           {c.label}
-          {c.badge && <span className="nav-badge num">{c.badge}</span>}
+          <NavBadge badge={c.badge} />
         </button>
       ))}
     </>
@@ -154,7 +168,7 @@ export const Sidebar = ({ user, route, setRoute, onLogout, open, onClose }) => {
               <button key={it.id} className={'nav-item' + (route === it.id ? ' active' : '')} onClick={() => { setRoute(it.id); onClose?.(); }}>
                 <I name={it.icon} size={18} />
                 {it.label}
-                {it.badge && <span className="nav-badge num">{it.badge}</span>}
+                <NavBadge badge={it.badge} />
               </button>
             ))}
           </div>
@@ -178,7 +192,8 @@ export const Sidebar = ({ user, route, setRoute, onLogout, open, onClose }) => {
 
 export const Topbar = ({ route, user, onSwitch, periodo, setPeriodo, onMenu }) => {
   const D = DATA;
-  const [t, sub] = TITLES[route] || ['', ''];
+  const tit = TITLES[route];
+  const [t] = (typeof tit === 'function' ? tit(D) : tit) || ['', ''];
   const [openP, setOpenP] = useState(false);
   return (
     <header className="topbar">
@@ -210,13 +225,14 @@ export const Topbar = ({ route, user, onSwitch, periodo, setPeriodo, onMenu }) =
           </>
         )}
       </div>
-      <button className="icon-btn" title="Notificações" style={{ position: 'relative' }}>
-        <I name="bell" size={18} />
-        <span style={{ position: 'absolute', top: 7, right: 8, width: 7, height: 7, borderRadius: '50%', background: 'var(--red)', border: '1.5px solid #fff' }} />
-      </button>
-      {/* Trocar de perfil (demo) */}
+      {/* Trocar de perfil: só em desenvolvimento; em produção mostra apenas o usuário logado */}
       <div style={{ position: 'relative' }}>
-        <SwitchProfile user={user} onSwitch={onSwitch} />
+        {DEMO ? <SwitchProfile user={user} onSwitch={onSwitch} /> : (
+          <div className="btn btn-subtle btn-sm" style={{ paddingLeft: 6, cursor: 'default' }}>
+            <Avatar nome={user.nome} iniciais={user.iniciais} cor={user.cor} size={26} />
+            <span className="profile-name" style={{ maxWidth: 110, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.nome.split(' ')[0]}</span>
+          </div>
+        )}
       </div>
     </header>
   );
@@ -236,7 +252,7 @@ const SwitchProfile = ({ user, onSwitch }) => {
       onSwitch(logged);
       setOpen(false);
     } catch (err) {
-      alert('Não foi possível trocar de perfil: ' + err.message);
+      avisar({ titulo: 'Não foi possível trocar de perfil', mensagem: err.message, tipo: 'erro' });
     } finally {
       setTrocando(null);
     }

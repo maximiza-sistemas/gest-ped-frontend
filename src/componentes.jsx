@@ -6,6 +6,7 @@
 import React, { useState } from 'react';
 import { DATA, criarComponente, atualizarComponente, excluirComponente } from './store.js';
 import { PageHeader, I, Modal } from './ui.jsx';
+import { confirmar } from './dialogo.jsx';
 
 // código automático a partir do nome (minúsculas, sem acentos, hífens)
 const slug = nome => nome.normalize('NFD').replace(/[̀-ͯ]/g, '')
@@ -71,9 +72,20 @@ export const ComponentesCurriculares = () => {
   const usoHabs = id => D.HABILIDADES.filter(h => h.comp === id).length;
   const usoProfs = id => D.PROFESSORES.filter(p => p.comp === id).length;
 
-  const excluir = async c => {
-    if (!window.confirm(`Excluir o componente curricular "${c.nome}"?`)) return;
-    try { await excluirComponente(c.id); } catch (err) { alert(err.message); }
+  const excluir = c => {
+    const habs = usoHabs(c.id);
+    const profs = usoProfs(c.id);
+    return confirmar({
+      titulo: `Excluir o componente curricular "${c.nome}"?`,
+      mensagem: 'O componente deixa de estar disponível para habilidades, professores e planejamentos.',
+      detalhes: [
+        habs > 0 && `${habs} habilidade(s) vinculada(s) a este componente.`,
+        profs > 0 && `${profs} professor(es) lecionam este componente.`,
+      ],
+      perigo: true,
+      textoConfirmar: 'Excluir componente',
+      aoConfirmar: () => excluirComponente(c.id),
+    });
   };
 
   return (

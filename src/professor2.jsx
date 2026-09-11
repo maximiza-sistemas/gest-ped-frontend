@@ -11,16 +11,21 @@ export const MeusAlunos = ({ openAluno }) => {
   const D = DATA;
   const [q, setQ] = useState('');
   const list = D.alunosT1.filter(a => a.nome.toLowerCase().includes(q.toLowerCase()));
+  // turma real carregada no store (roster) — nada fixo
+  const turma = D.TURMA_ATUAL;
+  const turmaTxt = turma ? `${turma.nome}${turma.escolaNome ? ' · ' + turma.escolaNome : ''} · ${D.alunosT1.length} aluno${D.alunosT1.length === 1 ? '' : 's'}` : 'Nenhuma turma vinculada';
+  // total de avaliações do aluno em todas as habilidades registradas
+  const totalAvals = a => Object.values(D.AVALIACOES[a.id] || {}).reduce((s, arr) => s + (arr ? arr.length : 0), 0);
   return (
     <div className="fade-in">
-      <PageHeader title="Meus alunos" subtitle="Turma 1º Ano A · 24 alunos. Clique em um aluno para ver a ficha individual completa." />
+      <PageHeader title="Meus alunos" subtitle={`${turmaTxt}. Clique em um aluno para ver a ficha individual completa.`} />
       <div style={{ position: 'relative', maxWidth: 320, marginBottom: 18 }}>
         <I name="search" size={16} style={{ position: 'absolute', left: 12, top: 11, color: 'var(--text-3)' }} />
         <input className="input" placeholder="Buscar aluno…" value={q} onChange={e => setQ(e.target.value)} style={{ paddingLeft: 36 }} />
       </div>
       <div className="grid grid-cols-3">
         {list.map(a => {
-          const avals = ['EF01LP01', 'EF01LP02', 'EF01LP04', 'EF01LP07'].reduce((s, h) => s + D.avalCount(a.id, h), 0);
+          const avals = totalAvals(a);
           return (
             <button key={a.id} className="card card-pad" style={{ textAlign: 'left', display: 'flex', flexDirection: 'column', gap: 12, transition: 'box-shadow .15s, transform .15s' }}
               onClick={() => openAluno(a.id)}
@@ -30,7 +35,7 @@ export const MeusAlunos = ({ openAluno }) => {
                 <Avatar nome={a.nome} iniciais={a.iniciais} cor="#64748b" size={42} />
                 <div style={{ flex: 1 }}>
                   <div style={{ fontWeight: 700, fontSize: 14 }}>{a.nome}</div>
-                  <div style={{ fontSize: 11.5, color: 'var(--text-3)' }}>Nº {String(a.numero).padStart(2, '0')} · 1º Ano A</div>
+                  <div style={{ fontSize: 11.5, color: 'var(--text-3)' }}>Nº {String(a.numero).padStart(2, '0')}{turma ? ' · ' + turma.nome : ''}</div>
                 </div>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 11, borderTop: '1px solid var(--border)' }}>
@@ -63,7 +68,9 @@ const AcompanhamentoBadge = ({ t }) => {
   return <span className="badge" style={{ background: 'var(--red-bg)', color: 'var(--red)' }}>{txt}</span>;
 };
 
-const SEMANA_VAZIA = () => ({ habilidades: [], sequenciaDidatica: '', recursosDidaticos: '', verificacaoAprendizagem: '', referencias: '' });
+// expectativas: { habCod: texto } — expectativa de aprendizagem definida pelo professor
+// para cada habilidade que será verificada na semana
+const SEMANA_VAZIA = () => ({ habilidades: [], expectativas: {}, sequenciaDidatica: '', recursosDidaticos: '', verificacaoAprendizagem: '', referencias: '' });
 
 export const MeuPlanejamento = () => {
   const D = DATA;
@@ -82,7 +89,7 @@ export const MeuPlanejamento = () => {
   const semanasDe = planoId => {
     const minhas = (D.SEMANAS[planoId] || []).filter(s => s.prof === profId).slice().sort((a, b) => a.semana - b.semana);
     return minhas.length
-      ? minhas.map(s => ({ habilidades: s.habilidades || [], sequenciaDidatica: s.sequenciaDidatica, recursosDidaticos: s.recursosDidaticos, verificacaoAprendizagem: s.verificacaoAprendizagem, referencias: s.referencias }))
+      ? minhas.map(s => ({ habilidades: s.habilidades || [], expectativas: s.expectativas || {}, sequenciaDidatica: s.sequenciaDidatica, recursosDidaticos: s.recursosDidaticos, verificacaoAprendizagem: s.verificacaoAprendizagem, referencias: s.referencias }))
       : [SEMANA_VAZIA()];
   };
   const [semanas, setSemanas] = useState(() => semanasDe(pl?.id));
@@ -113,10 +120,17 @@ export const MeuPlanejamento = () => {
   const anosTxt = pl.anos && pl.anos.length ? pl.anos.map(a => a + 'º').join(', ') + ' ano' : 'Todas as séries';
   const trab = D.TRABALHO[pl.id] || {}; // acompanhamento por habilidade (alimentado pela verificação contínua)
   const upd = (i, k, v) => setSemanas(ss => ss.map((s, j) => j === i ? { ...s, [k]: v } : s));
-  const toggleHabSemana = (i, cod) => setSemanas(ss => ss.map((s, j) => j === i
-    ? { ...s, habilidades: (s.habilidades || []).includes(cod) ? s.habilidades.filter(x => x !== cod) : [...(s.habilidades || []), cod] }
-    : s));
-  const addSemana = () => setSemanas(ss => [...ss, { habilidades: [], sequenciaDidatica: '', recursosDidaticos: '', verificacaoAprendizagem: '', referencias: '' }]);
+  const toggleHabSemana = (i, cod) => setSemanas(ss => ss.map((s, j) => {
+    if (j !== i) return s;
+    const marcada = (s.habilidades || []).includes(cod);
+    // desmarcar limpa a expectativa daquela habilidade
+    const { [cod]: _removida, ...restantes } = s.expectativas || {};
+    return marcada
+      ? { ...s, habilidades: s.habilidades.filter(x => x !== cod), expectativas: restantes }
+      : { ...s, habilidades: [...(s.habilidades || []), cod] };
+  }));
+  const setExpectativa = (i, cod, v) => setSemanas(ss => ss.map((s, j) => j === i ? { ...s, expectativas: { ...(s.expectativas || {}), [cod]: v } } : s));
+  const addSemana = () => setSemanas(ss => [...ss, SEMANA_VAZIA()]);
   const removeSemana = i => setSemanas(ss => ss.length > 1 ? ss.filter((_, j) => j !== i) : ss);
 
   const salvar = async () => {
@@ -126,6 +140,10 @@ export const MeuPlanejamento = () => {
       const payload = semanas.map((s, i) => ({
         semana: i + 1,
         habilidades: s.habilidades || [],
+        // só as expectativas das habilidades marcadas na semana
+        expectativas: Object.fromEntries((s.habilidades || [])
+          .map(cod => [cod, ((s.expectativas || {})[cod] || '').trim()])
+          .filter(([, v]) => v)),
         sequenciaDidatica: (s.sequenciaDidatica || '').trim(),
         recursosDidaticos: (s.recursosDidaticos || '').trim(),
         verificacaoAprendizagem: (s.verificacaoAprendizagem || '').trim(),
@@ -143,7 +161,7 @@ export const MeuPlanejamento = () => {
 
   return (
     <div className="fade-in">
-      <PageHeader title="Meu planejamento" subtitle="Organize a sequência didática semana a semana. As habilidades, a expectativa de aprendizagem e o mês são definidos pela Secretaria e não podem ser alterados."
+      <PageHeader title="Meu planejamento" subtitle="Organize a sequência didática semana a semana. As habilidades e o mês são definidos pela Secretaria; a expectativa de aprendizagem de cada habilidade verificada é definida por você."
         actions={meses.length > 0 && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <I name="calendar" size={15} style={{ color: 'var(--text-3)' }} />
@@ -224,6 +242,16 @@ export const MeuPlanejamento = () => {
                           {on && <AcompanhamentoBadge t={trab[cod]} />}
                         </div>
                         <div style={{ fontSize: 12, color: 'var(--text-2)', lineHeight: 1.4, marginTop: 3 }}>{h.desc}</div>
+                        {on && (
+                          <div style={{ marginTop: 8 }} onClick={e => e.preventDefault()}>
+                            <label className="field-label" style={{ marginBottom: 4 }}>Expectativa de aprendizagem <span style={{ color: 'var(--text-4)', fontWeight: 400 }}>(o que o aluno deve demonstrar nesta verificação)</span></label>
+                            <textarea className="input" rows={2} value={(s.expectativas || {})[cod] || ''}
+                              onChange={e => setExpectativa(i, cod, e.target.value)}
+                              onClick={e => e.stopPropagation()}
+                              placeholder={`Ex.: ao final da semana, o aluno ${(h.desc || '').slice(0, 1).toLowerCase()}${(h.desc || '').slice(1, 60).replace(/\.$/, '')}…`}
+                              style={{ resize: 'vertical', cursor: 'text' }} />
+                          </div>
+                        )}
                       </div>
                     </label>
                   );

@@ -12,11 +12,11 @@ import { ProfessorPainel, VerificacaoContinua } from './professor.jsx';
 import { MeusAlunos, MeuPlanejamento } from './professor2.jsx';
 import { FichaAluno } from './aluno.jsx';
 import { AdminRedeDashboard, AdminEscolas } from './admin.jsx';
-import { AdminEscolaDetail, AdminTurmas, AdminAlunos, AdminUsers, AdminConfig } from './admin2.jsx';
+import { AdminEscolaDetail, AdminUsers, AdminConfig } from './admin2.jsx';
 import { GruposEscolas } from './grupos.jsx';
-import { AnosEscolares } from './anos.jsx';
 import { ComponentesCurriculares } from './componentes.jsx';
 import { SagApp } from './sag.jsx';
+import { DialogHost } from './dialogo.jsx';
 
 const DEFAULT_ROUTE = { gestor: 'dashboard', professor: 'painel', admin: 'admrede', secretaria: 'admrede' };
 
@@ -111,13 +111,10 @@ const App = () => {
       case 'admrede': view = <AdminRedeDashboard openEscola={openEscola} />; break;
       case 'admescolas': view = <AdminEscolas openEscola={setEscolaId} />; break;
       case 'admgrupos': view = <GruposEscolas />; break;
-      case 'admanos': view = <AnosEscolares />; break;
       case 'admcomponentes': view = <ComponentesCurriculares />; break;
       case 'sag': view = <SagApp />; break;
-      case 'admturmas': view = <AdminTurmas />; break;
-      case 'admalunos': view = <AdminAlunos />; break;
       case 'admusers': view = <AdminUsers />; break;
-      case 'admconfig': view = <AdminConfig />; break;
+      case 'admconfig': view = <AdminConfig go={go} />; break;
       default: view = <div className="card card-pad">Em construção</div>;
     }
   }
@@ -134,6 +131,7 @@ const App = () => {
           <div className="content-inner">{view}</div>
         </div>
       </div>
+      <DialogHost />
     </div>
   );
 };

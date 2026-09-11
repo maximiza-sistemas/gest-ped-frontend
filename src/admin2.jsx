@@ -1,11 +1,12 @@
 /* ============================================================
-   Admin (parte 2) — Detalhe da escola, Turmas, Alunos,
-   Ficha de leitura, Usuários, Configurações
+   Admin (parte 2) — Detalhe da escola (espelho do SAG, consulta),
+   Usuários & acessos, Configurações
    ============================================================ */
 import React, { useState, useEffect } from 'react';
 import { DATA, adminCriarUsuario, adminEditarUsuario, adminExcluirUsuario, adminConfig, adminSalvarConfig,
-  fetchTurmas, fetchAlunos } from './store.js';
-import { PageHeader, Stat, I, Avatar, Modal, Paginacao, Bar } from './ui.jsx';
+  fetchTurmas } from './store.js';
+import { PageHeader, Stat, I, Avatar, Modal, Bar } from './ui.jsx';
+import { confirmar } from './dialogo.jsx';
 import { useEvolucao } from './evolucao.jsx';
 import { ZonaBadge } from './admin.jsx';
 
@@ -98,139 +99,8 @@ export const AdminEscolaDetail = ({ escolaId, back }) => {
   );
 };
 
-/* -------- Turmas (rede inteira) -------- */
-export const AdminTurmas = () => {
-  const D = DATA;
-  const escolas = D.escolasFull();
-  const [escFilter, setEscFilter] = useState('todas');
-  const [anoFilter, setAnoFilter] = useState('todos');
-  const [pagina, setPagina] = useState(0);
-  const [tamanho, setTamanho] = useState(50);
-  useEffect(() => { setPagina(0); }, [escFilter, anoFilter]);
-  let turmas = [];
-  escolas.forEach(e => { if (escFilter === 'todas' || escFilter === e.id) e.turmas.forEach(t => turmas.push({ ...t, escolaId: e.id, escolaNome: e.nome, escolaCor: e.cor, sigla: e.sigla })); });
-  if (anoFilter !== 'todos') turmas = turmas.filter(t => t.ano === +anoFilter);
-  const visiveis = turmas.slice(pagina * tamanho, (pagina + 1) * tamanho);
-
-  return (
-    <div className="fade-in">
-      <PageHeader title="Turmas" subtitle="Turmas sincronizadas automaticamente do SAG (somente leitura). Filtre por escola ou ano para localizar rapidamente." />
-      <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
-        <select className="input" style={{ maxWidth: 280 }} value={escFilter} onChange={e => setEscFilter(e.target.value)}>
-          <option value="todas">Todas as escolas</option>
-          {escolas.map(e => <option key={e.id} value={e.id}>{e.nome}</option>)}
-        </select>
-        <select className="input" style={{ maxWidth: 180 }} value={anoFilter} onChange={e => setAnoFilter(e.target.value)}>
-          <option value="todos">Todos os anos</option>
-          {D.ANOS.map(a => <option key={a.ordem} value={a.ordem}>{a.nome}</option>)}
-        </select>
-        <div style={{ flex: 1 }} />
-        <span style={{ alignSelf: 'center', fontSize: 12.5, color: 'var(--text-3)' }}>{turmas.length} turmas</span>
-      </div>
-      <div className="card">
-        <table className="tbl">
-          <thead><tr><th>Turma</th><th>Escola</th><th>Ano</th><th>Turno</th><th style={{ textAlign: 'center' }}>Alunos</th></tr></thead>
-          <tbody>
-            {visiveis.map(t => (
-              <tr key={t.id}>
-                <td style={{ fontWeight: 600 }}>{t.nome}</td>
-                <td>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-                    <div style={{ width: 26, height: 26, borderRadius: 7, background: t.escolaCor + '18', color: t.escolaCor, display: 'grid', placeItems: 'center', fontWeight: 700, fontSize: 9.5, flex: 'none' }}>{t.sigla}</div>
-                    <span style={{ color: 'var(--text-2)', fontSize: 13 }}>{t.escolaNome}</span>
-                  </div>
-                </td>
-                <td style={{ color: 'var(--text-2)' }}>{D.anoNome(t.ano)}</td>
-                <td style={{ color: 'var(--text-2)' }}>{t.turno}</td>
-                <td className="num" style={{ textAlign: 'center', fontWeight: 600 }}>{t.alunos.length}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        <Paginacao total={turmas.length} pagina={pagina} setPagina={setPagina}
-          tamanho={tamanho} setTamanho={setTamanho} rotulo="turmas" />
-      </div>
-    </div>
-  );
-};
-
-/* O detalhe da turma (roster) não existe no perfil de rede — o fluxo
-   para nas turmas; alunos ficam apenas no diretório "Alunos". */
-
-/* -------- Diretório de alunos (paginação no servidor) -------- */
-export const AdminAlunos = () => {
-  const D = DATA;
-  const escolas = D.escolasFull();
-  const [q, setQ] = useState('');
-  const [escFilter, setEscFilter] = useState('todas');
-  const [pagina, setPagina] = useState(0);
-  const [tamanho, setTamanho] = useState(50);
-  const [dados, setDados] = useState(null); // { total, alunos } · null = carregando
-
-  const carregar = () => fetchAlunos({
-    busca: q.trim() || undefined,
-    escola: escFilter !== 'todas' ? escFilter : undefined,
-    limit: tamanho,
-    offset: pagina * tamanho,
-  }).then(setDados).catch(() => setDados({ total: 0, alunos: [] }));
-
-  // busca com debounce; troca de filtro/página/tamanho recarrega direto
-  // (mantém os dados anteriores na tela durante o refetch — sem piscar)
-  useEffect(() => {
-    const t = setTimeout(carregar, q ? 300 : 0);
-    return () => clearTimeout(t);
-  }, [q, escFilter, pagina, tamanho]);
-  useEffect(() => { setPagina(0); }, [q, escFilter]);
-
-  const total = dados ? dados.total : 0;
-  const alunos = dados ? dados.alunos : [];
-
-  return (
-    <div className="fade-in">
-      <PageHeader title="Alunos" subtitle="Diretório de estudantes sincronizado automaticamente do SAG (somente leitura). Busque por nome ou filtre por escola." />
-      <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
-        <div style={{ position: 'relative', flex: 1, minWidth: 240 }}>
-          <I name="search" size={16} style={{ position: 'absolute', left: 12, top: 11, color: 'var(--text-3)' }} />
-          <input className="input" placeholder="Buscar aluno…" value={q} onChange={e => setQ(e.target.value)} style={{ paddingLeft: 36 }} />
-        </div>
-        <select className="input" style={{ maxWidth: 240 }} value={escFilter} onChange={e => setEscFilter(e.target.value)}>
-          <option value="todas">Todas as escolas</option>
-          {escolas.map(e => <option key={e.id} value={e.id}>{e.nome}</option>)}
-        </select>
-      </div>
-      <div className="card">
-        {dados === null && (
-          <div style={{ padding: '10px 16px', borderBottom: '1px solid var(--border)', fontSize: 12.5, color: 'var(--text-3)' }}>Carregando…</div>
-        )}
-        <table className="tbl">
-          <thead><tr><th>Aluno</th><th>Escola</th><th>Turma</th></tr></thead>
-          <tbody>
-            {dados !== null && alunos.length === 0 && (
-              <tr><td colSpan={3} style={{ color: 'var(--text-3)', padding: '18px 16px' }}>Nenhum aluno encontrado.</td></tr>
-            )}
-            {alunos.map(a => (
-              <tr key={a.id}>
-                <td><div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><Avatar nome={a.nome} iniciais={a.iniciais} cor="#64748b" size={30} /><span style={{ fontWeight: 600 }}>{a.nome}</span></div></td>
-                <td>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <div style={{ width: 24, height: 24, borderRadius: 6, background: a.escolaCor + '18', color: a.escolaCor, display: 'grid', placeItems: 'center', fontWeight: 700, fontSize: 9, flex: 'none' }}>{a.escolaSigla}</div>
-                    <span style={{ color: 'var(--text-2)', fontSize: 13 }}>{a.escolaNome}</span>
-                  </div>
-                </td>
-                <td style={{ color: 'var(--text-2)' }}>{a.turmaNome}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        <Paginacao total={total} pagina={pagina} setPagina={setPagina}
-          tamanho={tamanho} setTamanho={setTamanho} rotulo="alunos" />
-      </div>
-    </div>
-  );
-};
-
-/* A análise individual de alunos não está disponível no perfil de rede
-   (admin/secretaria) — o acompanhamento é agregado por escola e turma. */
+/* Turmas e alunos são espelho do SAG: no perfil de rede não há telas de cadastro nem
+   de listagem — a consulta é agregada, pelo dashboard e pelo detalhe da escola. */
 
 /* -------- Usuários & acessos -------- */
 const UserForm = ({ titulo, inicial, onSave, onClose, editando }) => {
@@ -240,21 +110,35 @@ const UserForm = ({ titulo, inicial, onSave, onClose, editando }) => {
   const [erro, setErro] = useState(null);
   const set = (k, v) => setF(x => ({ ...x, [k]: v }));
 
-  // vínculo do professor: turmas de toda a rede + escola em foco no seletor
+  // escolas do gestor: busca na rede inteira + seleção múltipla
+  const [buscaEscola, setBuscaEscola] = useState('');
+  const escolasSel = f.escolaIds || [];
+  const termo = buscaEscola.trim().toLowerCase();
+  const tokensE = termo.split(/\s+/).filter(Boolean); // cada palavra precisa aparecer (nome, sigla ou zona)
+  const escolasFiltradas = (D.ESCOLAS || []).filter(e => {
+    const alvo = `${e.nome} ${e.sigla || ''} ${e.zona || ''}`.toLowerCase();
+    return tokensE.every(tk => alvo.includes(tk));
+  });
+  const toggleEscola = id => set('escolaIds',
+    escolasSel.includes(id) ? escolasSel.filter(x => x !== id) : [...escolasSel, id]);
+
+  // vínculo do professor: turmas de toda a rede, com busca por turma / escola / ano
   const [turmasRede, setTurmasRede] = useState(DATA.TURMAS);
-  const [escolaProf, setEscolaProf] = useState((D.ESCOLAS[0] || {}).id || '');
+  const [buscaTurma, setBuscaTurma] = useState('');
   useEffect(() => {
     let ativo = true;
-    fetchTurmas().then(ts => {
-      if (!ativo) return;
-      setTurmasRede(ts);
-      const t0 = ts.find(t => (inicial.turmaIds || []).includes(t.id));
-      if (t0) setEscolaProf(t0.escola);
-    }).catch(() => {});
+    fetchTurmas().then(ts => { if (ativo) setTurmasRede(ts); }).catch(() => {});
     return () => { ativo = false; };
   }, []);
+  const turmasSel = f.turmaIds || [];
+  const termoT = buscaTurma.trim().toLowerCase();
+  const tokensT = termoT.split(/\s+/).filter(Boolean); // cada palavra precisa aparecer (turma, escola ou ano)
+  const turmasFiltradas = turmasRede.filter(t => {
+    const alvo = `${t.nome} ${D.escolaNome(t.escola)} ${D.anoNome(t.ano)}`.toLowerCase();
+    return tokensT.every(tk => alvo.includes(tk));
+  });
   const toggleTurma = tid => set('turmaIds',
-    (f.turmaIds || []).includes(tid) ? f.turmaIds.filter(x => x !== tid) : [...(f.turmaIds || []), tid]);
+    turmasSel.includes(tid) ? turmasSel.filter(x => x !== tid) : [...turmasSel, tid]);
 
   const salvar = async () => {
     setSalvando(true);
@@ -331,49 +215,106 @@ const UserForm = ({ titulo, inicial, onSave, onClose, editando }) => {
               </div>
             </div>
             <div>
-              <label className="field-label">Escola</label>
-              <select className="input" value={escolaProf} onChange={e => setEscolaProf(e.target.value)}>
-                {(D.ESCOLAS || []).map(e2 => <option key={e2.id} value={e2.id}>{e2.nome}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="field-label">Turmas do professor <span style={{ color: 'var(--text-4)', fontWeight: 400 }}>({(f.turmaIds || []).length} selecionada(s))</span></label>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 7, maxHeight: 180, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 10, padding: 8 }}>
-                {turmasRede.filter(t => t.escola === escolaProf).map(t => {
-                  const on = (f.turmaIds || []).includes(t.id);
+              <label className="field-label">
+                Turmas do professor{' '}
+                <span style={{ color: turmasSel.length ? 'var(--primary)' : 'var(--red)', fontWeight: 700 }}>({turmasSel.length} selecionada{turmasSel.length === 1 ? '' : 's'})</span>
+                <span style={{ color: 'var(--text-4)', fontWeight: 400 }}> — recebe as habilidades direcionadas ao ano e ao grupo dessas turmas</span>
+              </label>
+              {turmasSel.length > 0 && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+                  {turmasSel.map(id => {
+                    const t = turmasRede.find(x => x.id === id);
+                    return (
+                      <span key={id} className="chip" style={{ background: 'var(--primary-50)', color: 'var(--primary)', fontWeight: 600, paddingRight: 4 }}>
+                        {t ? `${t.nome} · ${D.escolaNome(t.escola)}` : id}
+                        <button type="button" className="icon-btn" title="Remover turma" onClick={() => toggleTurma(id)}
+                          style={{ width: 20, height: 20, marginLeft: 4, background: 'transparent', border: 'none', color: 'inherit' }}>
+                          <I name="x" size={12} />
+                        </button>
+                      </span>
+                    );
+                  })}
+                </div>
+              )}
+              <div style={{ position: 'relative', marginBottom: 8 }}>
+                <I name="search" size={15} style={{ position: 'absolute', left: 11, top: 11, color: 'var(--text-3)' }} />
+                <input className="input" placeholder="Buscar turma, escola ou ano…" value={buscaTurma}
+                  onChange={e => setBuscaTurma(e.target.value)} style={{ paddingLeft: 34 }} />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 200, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 10, padding: 6 }}>
+                {turmasFiltradas.slice(0, 80).map(t => {
+                  const on = turmasSel.includes(t.id);
                   return (
-                    <label key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 9px', borderRadius: 8, cursor: 'pointer',
+                    <label key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 9px', borderRadius: 8, cursor: 'pointer',
                       background: on ? 'var(--primary-50)' : 'transparent' }}>
                       <input type="checkbox" checked={on} onChange={() => toggleTurma(t.id)} />
                       <span style={{ fontWeight: 600, fontSize: 13 }}>{t.nome}</span>
-                      {t.turno && <span className="badge badge-gray" style={{ marginLeft: 'auto' }}>{t.turno}</span>}
+                      <span style={{ fontSize: 11.5, color: 'var(--text-3)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{D.anoNome(t.ano)} · {D.escolaNome(t.escola)}</span>
+                      {t.turno && <span className="badge badge-gray">{t.turno}</span>}
                     </label>
                   );
                 })}
-                {turmasRede.filter(t => t.escola === escolaProf).length === 0 && (
-                  <span style={{ fontSize: 12.5, color: 'var(--text-3)' }}>Nenhuma turma nesta escola.</span>
+                {turmasFiltradas.length === 0 && (
+                  <span style={{ fontSize: 12.5, color: 'var(--text-3)', padding: '6px 9px' }}>
+                    {turmasRede.length ? 'Nenhuma turma encontrada para essa busca.' : 'Nenhuma turma cadastrada.'}
+                  </span>
                 )}
+              </div>
+              <div style={{ fontSize: 11.5, color: 'var(--text-4)', marginTop: 6 }}>
+                {turmasFiltradas.length} de {turmasRede.length} turmas da rede{termoT ? ' correspondem à busca' : ''}{turmasFiltradas.length > 80 ? ' · refine a busca para ver as demais' : ''}.
               </div>
             </div>
           </>
         )}
         {f.perfil === 'gestor' && (
           <div>
-            <label className="field-label">Escolas do gestor <span style={{ color: 'var(--text-4)', fontWeight: 400 }}>(acesso automático a todas as turmas dessas escolas)</span></label>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 7, maxHeight: 180, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 10, padding: 8 }}>
-              {(D.ESCOLAS || []).map(e => {
-                const on = (f.escolaIds || []).includes(e.id);
+            <label className="field-label">
+              Escolas do gestor{' '}
+              <span style={{ color: escolasSel.length ? 'var(--primary)' : 'var(--red)', fontWeight: 700 }}>({escolasSel.length} selecionada{escolasSel.length === 1 ? '' : 's'})</span>
+              <span style={{ color: 'var(--text-4)', fontWeight: 400 }}> — o gestor acessa somente os dados dessas escolas</span>
+            </label>
+            {escolasSel.length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+                {escolasSel.map(id => {
+                  const e = (D.ESCOLAS || []).find(x => x.id === id) || { nome: id };
+                  return (
+                    <span key={id} className="chip" style={{ background: 'var(--primary-50)', color: 'var(--primary)', fontWeight: 600, paddingRight: 4 }}>
+                      {e.nome}
+                      <button type="button" className="icon-btn" title="Remover escola" onClick={() => toggleEscola(id)}
+                        style={{ width: 20, height: 20, marginLeft: 4, background: 'transparent', border: 'none', color: 'inherit' }}>
+                        <I name="x" size={12} />
+                      </button>
+                    </span>
+                  );
+                })}
+              </div>
+            )}
+            <div style={{ position: 'relative', marginBottom: 8 }}>
+              <I name="search" size={15} style={{ position: 'absolute', left: 11, top: 11, color: 'var(--text-3)' }} />
+              <input className="input" placeholder="Buscar escola por nome, sigla ou zona…" value={buscaEscola}
+                onChange={e => setBuscaEscola(e.target.value)} style={{ paddingLeft: 34 }} />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 200, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 10, padding: 6 }}>
+              {escolasFiltradas.map(e => {
+                const on = escolasSel.includes(e.id);
                 return (
-                  <label key={e.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 9px', borderRadius: 8, cursor: 'pointer',
+                  <label key={e.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 9px', borderRadius: 8, cursor: 'pointer',
                     background: on ? 'var(--primary-50)' : 'transparent' }}>
-                    <input type="checkbox" checked={on} onChange={() => set('escolaIds',
-                      on ? f.escolaIds.filter(x => x !== e.id) : [...(f.escolaIds || []), e.id])} />
-                    <span style={{ fontWeight: 600, fontSize: 13 }}>{e.nome}</span>
-                    {e.zona && <span className="badge badge-gray" style={{ marginLeft: 'auto' }}>{e.zona}</span>}
+                    <input type="checkbox" checked={on} onChange={() => toggleEscola(e.id)} />
+                    <span style={{ fontWeight: 600, fontSize: 13, flex: 1 }}>{e.nome}</span>
+                    {e.sigla && <span className="num" style={{ fontSize: 11, color: 'var(--text-4)' }}>{e.sigla}</span>}
+                    {e.zona && <span className="badge badge-gray">{e.zona}</span>}
                   </label>
                 );
               })}
-              {(!D.ESCOLAS || D.ESCOLAS.length === 0) && <span style={{ fontSize: 12.5, color: 'var(--text-3)' }}>Nenhuma escola cadastrada.</span>}
+              {escolasFiltradas.length === 0 && (
+                <span style={{ fontSize: 12.5, color: 'var(--text-3)', padding: '6px 9px' }}>
+                  {(D.ESCOLAS || []).length ? 'Nenhuma escola encontrada para essa busca.' : 'Nenhuma escola cadastrada.'}
+                </span>
+              )}
+            </div>
+            <div style={{ fontSize: 11.5, color: 'var(--text-4)', marginTop: 6 }}>
+              {escolasFiltradas.length} de {(D.ESCOLAS || []).length} escolas da rede{termo ? ' correspondem à busca' : ''}.
             </div>
           </div>
         )}
@@ -409,10 +350,13 @@ export const AdminUsers = () => {
     ...vinculoProf(f),
   });
   const profDe = id => D.PROFESSORES.find(x => x.id === id) || {};
-  const excluir = async u => {
-    if (!window.confirm(`Excluir o usuário ${u.nome}?`)) return;
-    try { await adminExcluirUsuario(u.id); } catch (err) { alert(err.message); }
-  };
+  const excluir = u => confirmar({
+    titulo: `Excluir o usuário ${u.nome}?`,
+    mensagem: `A conta ${u.email} perde o acesso à plataforma imediatamente.`,
+    perigo: true,
+    textoConfirmar: 'Excluir usuário',
+    aoConfirmar: () => adminExcluirUsuario(u.id),
+  });
 
   return (
     <div className="fade-in">
@@ -458,8 +402,16 @@ export const AdminUsers = () => {
 };
 
 /* -------- Configurações + permissões -------- */
-export const AdminConfig = () => {
+export const AdminConfig = ({ go }) => {
   const D = DATA;
+  // cartões alimentados pelos catálogos reais (nada fixo) com atalho para a página de gestão
+  const periodoAtual = D.PERIODOS.find(p => p.atual);
+  const cartoes = [
+    ['Componentes curriculares', D.COMPONENTES.length ? D.COMPONENTES.map(c => c.nome).join(', ') : 'Nenhum cadastrado', 'skills', 'admcomponentes'],
+    ['Períodos avaliativos', `${D.PERIODOS.length} período${D.PERIODOS.length === 1 ? '' : 's'} · atual: ${periodoAtual ? periodoAtual.nome : '—'}`, 'calendar', 'periodos'],
+    // anos escolares vêm do espelho do SAG (série de cada turma) — sem cadastro
+    ['Anos escolares (do SAG)', D.ANOS.length ? D.ANOS.map(a => a.nome).join(', ') : 'Nenhum sincronizado', 'grad', null],
+  ];
   const [cfg, setCfg] = useState(null);
   const [salvando, setSalvando] = useState(false);
   const [msg, setMsg] = useState(null);
@@ -515,18 +467,14 @@ export const AdminConfig = () => {
     </div>
 
     <div className="grid grid-cols-2" style={{ marginBottom: 22 }}>
-      {[
-        ['Componentes curriculares', 'Língua Portuguesa, Matemática', 'skills'],
-        ['Períodos avaliativos', 'Bimestral · 4 períodos', 'calendar'],
-        ['Recuperação de senha', 'Via e-mail cadastrado', 'lock'],
-      ].map((c, i) => (
-        <div key={i} className="card card-pad" style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-          <div style={{ width: 42, height: 42, borderRadius: 11, background: 'var(--primary-50)', color: 'var(--primary)', display: 'grid', placeItems: 'center', flex: 'none' }}><I name={c[2]} size={20} /></div>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontWeight: 700, fontSize: 14 }}>{c[0]}</div>
-            <div style={{ fontSize: 12.5, color: 'var(--text-3)' }}>{c[1]}</div>
+      {cartoes.map(([titulo, resumo, icone, rota]) => (
+        <div key={titulo} className="card card-pad" style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <div style={{ width: 42, height: 42, borderRadius: 11, background: 'var(--primary-50)', color: 'var(--primary)', display: 'grid', placeItems: 'center', flex: 'none' }}><I name={icone} size={20} /></div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontWeight: 700, fontSize: 14 }}>{titulo}</div>
+            <div style={{ fontSize: 12.5, color: 'var(--text-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={resumo}>{resumo}</div>
           </div>
-          <button className="btn btn-subtle btn-sm">Editar</button>
+          {go && rota && <button className="btn btn-subtle btn-sm" onClick={() => go(rota)}>Gerenciar<I name="chevR" size={14} /></button>}
         </div>
       ))}
     </div>

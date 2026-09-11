@@ -136,18 +136,12 @@ export async function hydrateGestor(user) {
   DATA.SEMANAS = Object.fromEntries(detalhes.map(d => [d.id, d.semanas || []]));
 }
 
+/** Resumo real do trabalho de cada professor no escopo (GET /professores/resumo) */
+export const fetchProfessoresResumo = () => api.get('/professores/resumo');
+
 /** Turmas no escopo do usuário (secretaria/admin = rede toda; gestor = grupo) */
 export async function fetchTurmas() {
   return api.get('/turmas');
-}
-
-/** Diretório de alunos paginado: { escola?, turma?, busca?, limit?, offset? } → { total, alunos } */
-export async function fetchAlunos(params = {}) {
-  const qs = Object.entries(params)
-    .filter(([, v]) => v !== undefined && v !== null && v !== '')
-    .map(([k, v]) => `${k}=${encodeURIComponent(v)}`)
-    .join('&');
-  return api.get('/alunos' + (qs ? '?' + qs : ''));
 }
 
 export async function hydratePlano(id) {
@@ -357,27 +351,8 @@ export async function adminSalvarConfig(payload) {
   notify();
 }
 
-/* ---------------- anos escolares (séries) — admin/secretaria ---------------- */
-export const fetchAnos = () => api.get('/anos');
-export async function criarAno(payload) {
-  const a = await api.post('/anos', payload);
-  await hydrateMeta(); // atualiza DATA.ANOS p/ os seletores
-  notify();
-  return a;
-}
-export async function atualizarAno(ordem, payload) {
-  const a = await api.patch('/anos/' + ordem, payload);
-  await hydrateMeta();
-  notify();
-  return a;
-}
-export async function excluirAno(ordem) {
-  await api.delete('/anos/' + ordem);
-  await hydrateMeta();
-  notify();
-}
-
-/* escolas/turmas/alunos são espelhados do SAG — somente leitura (sem CRUD local) */
+/* escolas/turmas/alunos e anos escolares são espelhados do SAG — somente leitura (sem CRUD local);
+   o único catálogo editável no perfil de rede é o de componentes curriculares */
 
 /* fetch lazy usados nas fichas/drill-down */
 export const fetchAlunoFull = id => api.get('/alunos/' + id + '/full');
