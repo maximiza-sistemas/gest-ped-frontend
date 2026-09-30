@@ -13,7 +13,7 @@ export const MeusAlunos = ({ openAluno }) => {
   const list = D.alunosT1.filter(a => a.nome.toLowerCase().includes(q.toLowerCase()));
   // turma real carregada no store (roster) — nada fixo
   const turma = D.TURMA_ATUAL;
-  const turmaTxt = turma ? `${turma.nome}${turma.escolaNome ? ' · ' + turma.escolaNome : ''} · ${D.alunosT1.length} aluno${D.alunosT1.length === 1 ? '' : 's'}` : 'Nenhuma turma vinculada';
+  const turmaTxt = turma ? `${D.turmaRotulo(turma.nome)}${turma.escolaNome ? ' · ' + turma.escolaNome : ''} · ${D.alunosT1.length} aluno${D.alunosT1.length === 1 ? '' : 's'}` : 'Nenhuma turma vinculada';
   // total de avaliações do aluno em todas as habilidades registradas
   const totalAvals = a => Object.values(D.AVALIACOES[a.id] || {}).reduce((s, arr) => s + (arr ? arr.length : 0), 0);
   return (
@@ -35,7 +35,7 @@ export const MeusAlunos = ({ openAluno }) => {
                 <Avatar nome={a.nome} iniciais={a.iniciais} cor="#64748b" size={42} />
                 <div style={{ flex: 1 }}>
                   <div style={{ fontWeight: 700, fontSize: 14 }}>{a.nome}</div>
-                  <div style={{ fontSize: 11.5, color: 'var(--text-3)' }}>Nº {String(a.numero).padStart(2, '0')}{turma ? ' · ' + turma.nome : ''}</div>
+                  <div style={{ fontSize: 11.5, color: 'var(--text-3)' }}>Nº {String(a.numero).padStart(2, '0')}{turma ? ' · ' + D.turmaRotulo(turma.nome) : ''}</div>
                 </div>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 11, borderTop: '1px solid var(--border)' }}>

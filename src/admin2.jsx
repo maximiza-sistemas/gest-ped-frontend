@@ -63,7 +63,7 @@ export const AdminEscolaDetail = ({ escolaId, back }) => {
               const nao = s ? s.avaliacoes - s.atingiram : 0;
               return (
                 <tr key={t.id}>
-                  <td style={{ fontWeight: 600 }}>{t.nome}</td>
+                  <td style={{ fontWeight: 600 }}>{D.turmaRotulo(t.nome)}</td>
                   <td style={{ color: 'var(--text-2)' }}>{D.anoNome(t.ano)}</td>
                   <td style={{ color: 'var(--text-2)' }}>{t.turno}</td>
                   <td className="num" style={{ textAlign: 'center', fontWeight: 600 }}>{t.alunos.length}</td>
@@ -134,7 +134,7 @@ const UserForm = ({ titulo, inicial, onSave, onClose, editando }) => {
   const termoT = buscaTurma.trim().toLowerCase();
   const tokensT = termoT.split(/\s+/).filter(Boolean); // cada palavra precisa aparecer (turma, escola ou ano)
   const turmasFiltradas = turmasRede.filter(t => {
-    const alvo = `${t.nome} ${D.escolaNome(t.escola)} ${D.anoNome(t.ano)}`.toLowerCase();
+    const alvo = `${t.nome} ${D.turmaRotulo(t.nome)} ${D.escolaNome(t.escola)} ${D.anoNome(t.ano)}`.toLowerCase();
     return tokensT.every(tk => alvo.includes(tk));
   });
   const toggleTurma = tid => set('turmaIds',
@@ -226,7 +226,7 @@ const UserForm = ({ titulo, inicial, onSave, onClose, editando }) => {
                     const t = turmasRede.find(x => x.id === id);
                     return (
                       <span key={id} className="chip" style={{ background: 'var(--primary-50)', color: 'var(--primary)', fontWeight: 600, paddingRight: 4 }}>
-                        {t ? `${t.nome} · ${D.escolaNome(t.escola)}` : id}
+                        {t ? `${D.turmaRotulo(t.nome)} · ${D.escolaNome(t.escola)}` : id}
                         <button type="button" className="icon-btn" title="Remover turma" onClick={() => toggleTurma(id)}
                           style={{ width: 20, height: 20, marginLeft: 4, background: 'transparent', border: 'none', color: 'inherit' }}>
                           <I name="x" size={12} />
@@ -248,8 +248,8 @@ const UserForm = ({ titulo, inicial, onSave, onClose, editando }) => {
                     <label key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 9px', borderRadius: 8, cursor: 'pointer',
                       background: on ? 'var(--primary-50)' : 'transparent' }}>
                       <input type="checkbox" checked={on} onChange={() => toggleTurma(t.id)} />
-                      <span style={{ fontWeight: 600, fontSize: 13 }}>{t.nome}</span>
-                      <span style={{ fontSize: 11.5, color: 'var(--text-3)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{D.anoNome(t.ano)} · {D.escolaNome(t.escola)}</span>
+                      <span style={{ fontWeight: 600, fontSize: 13 }}>{D.turmaRotulo(t.nome)}</span>
+                      <span style={{ fontSize: 11.5, color: 'var(--text-3)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{D.escolaNome(t.escola)}</span>
                       {t.turno && <span className="badge badge-gray">{t.turno}</span>}
                     </label>
                   );

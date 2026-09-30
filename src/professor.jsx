@@ -384,7 +384,7 @@ export const VerificacaoContinua = ({ openAluno }) => {
             <div style={{ width: 200 }}>
               <label className="field-label">Turma avaliada</label>
               <select className="input" value={turmaSel || ''} onChange={e => setTurmaSel(e.target.value)}>
-                {turmasDisp.map(t => <option key={t.id} value={t.id}>{t.nome}{t.turno ? ' · ' + t.turno : ''}</option>)}
+                {turmasDisp.map(t => <option key={t.id} value={t.id}>{D.turmaRotulo(t.nome)}{t.turno ? ' · ' + t.turno : ''}</option>)}
               </select>
             </div>
           )}

@@ -4,6 +4,20 @@
    login; as views continuam lendo DATA sincronamente.
    ============================================================ */
 
+/* Rótulo curto da turma a partir do nome vindo do SAG:
+   "3 ANO" → "3º" · "1º ANO A" / "8ºANOA" → "1º A" / "8º A" · "4º A" / "8ºB" / "6A" → "4º A" / "8º B" / "6º A".
+   Nomes que não são série numérica (TURMA MULT, Infantil I…, EJA combinada) ficam como estão. */
+export const turmaRotulo = nome => {
+  const s = String(nome || '').trim().replace(/°/g, 'º');
+  const comAno = s.match(/^(\d{1,2})\s*[ºª]?\s*ANOS?\s*(.*)$/i);   // 3 ANO · 1º ANO A · 8ºANOA
+  const semAno = s.match(/^(\d{1,2})\s*[ºª]\s*([A-Z]{0,2})$/i);   // 4º A · 8ºB
+  const colado = s.match(/^(\d{1,2})\s?([A-Z])$/i);               // 6A · 8 A
+  const m = comAno || semAno || colado;
+  if (!m) return s;
+  const resto = (m[2] || '').trim();
+  return `${Number(m[1])}º${resto ? ' ' + resto.toUpperCase() : ''}`;
+};
+
 const RES_LABEL = { 1: 'Não atingiu', 2: 'Atingiu' };
 const RES_COR   = { 1: 'red', 2: 'green' };
 
@@ -61,7 +75,8 @@ export const DATA = {
     return a && a[hab] ? a[hab].length : 0;
   },
   compNome: id => (DATA.COMPONENTES.find(c => c.id === id) || {}).nome || id,
-  turmaNome: id => (DATA.TURMAS.find(t => t.id === id) || {}).nome || id,
+  turmaNome: id => { const t = DATA.TURMAS.find(x => x.id === id); return t ? turmaRotulo(t.nome) : id; },
+  turmaRotulo: nome => turmaRotulo(nome),
   profNome: id => (DATA.PROFESSORES.find(p => p.id === id) || {}).nome || id,
   escolaNome: id => (DATA.ESCOLAS.find(e => e.id === id) || {}).nome || id,
   usuarioNome: id => (DATA.USUARIOS.find(u => u.id === id) || {}).nome || id,

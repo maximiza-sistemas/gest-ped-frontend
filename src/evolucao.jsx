@@ -289,7 +289,7 @@ export const EvolucaoEscopo = ({ contagens = false, secao = false, children }) =
   const t = dados.totais;
   const labels = dados.meses.map(m => m.nome.slice(0, 3));
   const ultimo = dados.meses[dados.meses.length - 1];
-  const rotTurma = tu => `${D.anoNome(tu.ano)} ${tu.nome}`;
+  const rotTurma = tu => D.turmaRotulo(tu.nome);
   // análise individual de alunos só no escopo do gestor (rede é agregada)
   const podeAlunos = dados.escopo === 'gestor';
 
@@ -508,10 +508,10 @@ export const EvolucaoProfessor = ({ openAluno, embutido = false }) => {
 
   const t = dados.totais;
   const multi = dados.entidades.length > 1;
-  const rotTurma = tu => `${D.anoNome(tu.ano)} ${tu.nome}${tu.sub ? ' · ' + tu.sub : ''}`;
+  const rotTurma = tu => `${D.turmaRotulo(tu.nome)}${tu.sub ? ' · ' + tu.sub : ''}`;
   const turmaNomeDe = id => {
     const tu = dados.entidades.find(e => e.id === id);
-    return tu ? `${D.anoNome(tu.ano)} ${tu.nome}` : id;
+    return tu ? D.turmaRotulo(tu.nome) : id;
   };
 
   // eixo por EVENTO de acompanhamento (ordem de registro), uma linha por habilidade

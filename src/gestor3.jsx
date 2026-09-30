@@ -49,7 +49,7 @@ export const ProfessoresTurmas = ({ openAluno }) => {
                   <td><span className="badge badge-blue">{D.compNome(p.comp)}</span></td>
                   <td style={{ color: 'var(--text-2)', fontSize: 13 }}>
                     {p.turmas.length === 0 ? '—' : p.turmas.map(t => (
-                      <div key={t.id}>{t.nome} <span style={{ color: 'var(--text-4)', fontSize: 11.5 }}>· {t.escolaNome} · {t.alunos} alunos</span></div>
+                      <div key={t.id}>{D.turmaRotulo(t.nome)} <span style={{ color: 'var(--text-4)', fontSize: 11.5 }}>· {t.escolaNome} · {t.alunos} alunos</span></div>
                     ))}
                   </td>
                   <td style={{ minWidth: 200 }}>
@@ -74,7 +74,7 @@ export const ProfessoresTurmas = ({ openAluno }) => {
         )}
       </div>
 
-      <h3 style={{ fontSize: 15, marginBottom: 12 }}>Alunos · {D.TURMA_ATUAL?.nome || 'turma'}{D.TURMA_ATUAL?.escolaNome ? ' · ' + D.TURMA_ATUAL.escolaNome : ''} · {D.alunosT1.length}</h3>
+      <h3 style={{ fontSize: 15, marginBottom: 12 }}>Alunos · {D.TURMA_ATUAL ? D.turmaRotulo(D.TURMA_ATUAL.nome) : 'turma'}{D.TURMA_ATUAL?.escolaNome ? ' · ' + D.TURMA_ATUAL.escolaNome : ''} · {D.alunosT1.length}</h3>
       <div className="card">
         <table className="tbl">
           <thead><tr><th style={{ width: 40 }}>Nº</th><th>Aluno</th><th></th></tr></thead>

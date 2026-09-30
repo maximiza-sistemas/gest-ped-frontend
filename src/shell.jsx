@@ -104,7 +104,7 @@ const TITLES = {
   periodos: ['Períodos avaliativos', 'Períodos avaliativos do ano letivo'],
   painel: ['Dashboard', 'Habilidades direcionadas e evolução das suas turmas e alunos'],
   verificacao: ['Verificação contínua', 'Registre o desempenho individual dos alunos'],
-  alunos: D => ['Meus alunos', D.TURMA_ATUAL ? `${D.TURMA_ATUAL.nome} · ${(D.alunosT1 || []).length} alunos` : 'Alunos das suas turmas'],
+  alunos: D => ['Meus alunos', D.TURMA_ATUAL ? `${D.turmaRotulo(D.TURMA_ATUAL.nome)} · ${(D.alunosT1 || []).length} alunos` : 'Alunos das suas turmas'],
   planoprof: ['Meu planejamento', 'Edite atividades e estratégias do planejamento recebido'],
   admrede: ['Dashboard', 'Indicadores e evolução da rede de ensino'],
   admescolas: ['Escolas', 'Unidades escolares da rede municipal'],

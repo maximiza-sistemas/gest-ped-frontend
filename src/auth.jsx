@@ -1,30 +1,34 @@
 /* ============================================================
-   Login / autenticação — e-mail e senha reais (JWT na API)
+   Login / autenticação — e-mail e senha reais (JWT na API).
+   O perfil não é escolhido na tela: vem do usuário no banco.
    ============================================================ */
 import React, { useState } from 'react';
 import { login } from './store.js';
 import { I } from './ui.jsx';
 
-// perfis demonstrativos (a tela de login não depende da API)
-const PERFIS = [
-  { id: 'secretaria', nome: 'Secretaria de Educação', desc: 'Orienta a rede e acompanha todas as escolas.', icon: 'layers', email: 'beatriz@rededeensino.edu.br' },
-  { id: 'gestor', nome: 'Gestor Escolar / Coordenador', desc: 'Planeja e acompanha o seu grupo de escolas.', icon: 'grad', email: 'camila@rededeensino.edu.br' },
-  { id: 'professor', nome: 'Professor', desc: 'Executa o planejamento e avalia os alunos.', icon: 'check', email: 'helena@rededeensino.edu.br' },
-  { id: 'admin', nome: 'Administrador', desc: 'Configura a plataforma e gerencia acessos.', icon: 'settings', email: 'sergio@rededeensino.edu.br' },
-];
-
 // atalhos de demonstração (e-mail/senha preenchidos) só no build de desenvolvimento
 const DEMO = import.meta.env.DEV;
+const DEMO_EMAIL = 'beatriz@rededeensino.edu.br';
+
+// campo com ícone à esquerda — todos com a mesma largura, altura e recuo
+const Campo = ({ id, label, icon, children }) => (
+  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+    <label className="field-label" htmlFor={id} style={{ margin: 0 }}>{label}</label>
+    <div style={{ position: 'relative' }}>
+      <I name={icon} size={16} style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-3)', pointerEvents: 'none' }} />
+      {children}
+    </div>
+  </div>
+);
+
+const inputStyle = { width: '100%', height: 44, paddingLeft: 40 };
 
 export const Login = ({ onLogin }) => {
-  const [perfil, setPerfil] = useState('secretaria');
-  const [email, setEmail] = useState(DEMO ? PERFIS[0].email : '');
+  const [email, setEmail] = useState(DEMO ? DEMO_EMAIL : '');
   const [senha, setSenha] = useState(DEMO ? 'demo123' : '');
   const [lembrar, setLembrar] = useState(true); // sessão longa: acesso direto na volta
   const [erro, setErro] = useState(null);
   const [carregando, setCarregando] = useState(false);
-
-  const selecionar = p => { setPerfil(p.id); if (DEMO) setEmail(p.email); setErro(null); };
 
   const entrar = async e => {
     e.preventDefault();
@@ -65,39 +69,24 @@ export const Login = ({ onLogin }) => {
         <div />
       </div>
 
-      {/* Lado direito — acesso (rola quando o conteúdo passa da altura da viewport) */}
+      {/* Lado direito — acesso */}
       <div style={{ display: 'flex', overflowY: 'auto', padding: 40, background: 'var(--surface)' }}>
-        <form style={{ width: '100%', maxWidth: 392, margin: 'auto' }} className="fade-in" onSubmit={entrar}>
-          <h2 style={{ fontSize: 24, letterSpacing: '-.02em' }}>Entrar na plataforma</h2>
-          <p style={{ color: 'var(--text-2)', marginTop: 6, marginBottom: 26 }}>Selecione seu perfil de acesso para continuar.</p>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 22 }}>
-            {PERFIS.map(p => (
-              <button type="button" key={p.id} onClick={() => selecionar(p)}
-                style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '13px 15px', borderRadius: 12, textAlign: 'left',
-                  border: '1.5px solid ' + (perfil === p.id ? 'var(--primary)' : 'var(--border)'),
-                  background: perfil === p.id ? 'var(--primary-50)' : 'var(--surface)', transition: 'all .14s' }}>
-                <div style={{ width: 40, height: 40, borderRadius: 10, flex: 'none', display: 'grid', placeItems: 'center',
-                  background: perfil === p.id ? 'var(--primary)' : 'var(--surface-3)', color: perfil === p.id ? '#fff' : 'var(--text-2)' }}>
-                  <I name={p.icon} size={20} />
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 700, fontSize: 14.5 }}>{p.nome}</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-3)' }}>{p.desc}</div>
-                </div>
-                <div style={{ width: 19, height: 19, borderRadius: '50%', border: '2px solid ' + (perfil === p.id ? 'var(--primary)' : 'var(--border-strong)'),
-                  display: 'grid', placeItems: 'center' }}>
-                  {perfil === p.id && <div style={{ width: 9, height: 9, borderRadius: '50%', background: 'var(--primary)' }} />}
-                </div>
-              </button>
-            ))}
+        <form style={{ width: '100%', maxWidth: 380, margin: 'auto', display: 'flex', flexDirection: 'column', gap: 18 }} className="fade-in" onSubmit={entrar}>
+          <div style={{ marginBottom: 6 }}>
+            <h2 style={{ fontSize: 24, letterSpacing: '-.02em' }}>Entrar na plataforma</h2>
+            <p style={{ color: 'var(--text-2)', marginTop: 6 }}>Informe seu e-mail e senha para acessar.</p>
           </div>
 
-          <label className="field-label">E-mail</label>
-          <input className="input" value={email} onChange={e => setEmail(e.target.value)} autoComplete="username" style={{ marginBottom: 14 }} />
-          <label className="field-label">Senha</label>
-          <input className="input" type="password" value={senha} onChange={e => setSenha(e.target.value)} autoComplete="current-password" style={{ marginBottom: 8 }} />
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginBottom: 18 }}>
+          <Campo id="login-email" label="E-mail" icon="user">
+            <input id="login-email" className="input" type="email" value={email} onChange={e => setEmail(e.target.value)}
+              autoComplete="username" placeholder="seu.email@rededeensino.edu.br" required style={inputStyle} />
+          </Campo>
+          <Campo id="login-senha" label="Senha" icon="lock">
+            <input id="login-senha" className="input" type="password" value={senha} onChange={e => setSenha(e.target.value)}
+              autoComplete="current-password" placeholder="Sua senha" required style={inputStyle} />
+          </Campo>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginTop: -4 }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12.5, color: 'var(--text-2)', fontWeight: 600, cursor: 'pointer' }}>
               <input type="checkbox" checked={lembrar} onChange={e => setLembrar(e.target.checked)}
                 style={{ width: 15, height: 15, accentColor: 'var(--primary)' }} />
@@ -107,18 +96,19 @@ export const Login = ({ onLogin }) => {
           </div>
 
           {erro && (
-            <div style={{ display: 'flex', gap: 9, alignItems: 'flex-start', padding: '11px 13px', borderRadius: 10, background: 'var(--red-bg)', color: 'var(--red)', fontSize: 13, fontWeight: 600, marginBottom: 14 }}>
+            <div role="alert" style={{ display: 'flex', gap: 9, alignItems: 'flex-start', padding: '11px 13px', borderRadius: 10, background: 'var(--red-bg)', color: 'var(--red)', fontSize: 13, fontWeight: 600 }}>
               <I name="info" size={16} style={{ flex: 'none', marginTop: 1 }} />
               <span>{erro}</span>
             </div>
           )}
 
-          <button type="submit" className="btn btn-primary" disabled={carregando} style={{ width: '100%', padding: '12px', opacity: carregando ? .7 : 1 }}>
-            {carregando ? 'Entrando…' : <>Entrar como {PERFIS.find(p => p.id === perfil).nome}<I name="chevR" size={16} /></>}
+          <button type="submit" className="btn btn-primary" disabled={carregando} style={{ width: '100%', height: 44, opacity: carregando ? .7 : 1 }}>
+            {carregando ? 'Entrando…' : <>Entrar<I name="chevR" size={16} /></>}
           </button>
           {DEMO && (
-            <p style={{ fontSize: 11.5, color: 'var(--text-4)', textAlign: 'center', marginTop: 18 }}>
-              Ambiente de desenvolvimento · senha <b>demo123</b> para os perfis de demonstração
+            <p style={{ fontSize: 11.5, color: 'var(--text-4)', textAlign: 'center', lineHeight: 1.6 }}>
+              Ambiente de desenvolvimento · senha <b>demo123</b><br />
+              beatriz · camila · helena · sergio @rededeensino.edu.br
             </p>
           )}
         </form>
