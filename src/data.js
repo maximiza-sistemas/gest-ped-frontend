@@ -5,7 +5,7 @@
    ============================================================ */
 
 /* Rótulo curto da turma a partir do nome vindo do SAG:
-   "3 ANO" → "3º" · "1º ANO A" / "8ºANOA" → "1º A" / "8º A" · "4º A" / "8ºB" / "6A" → "4º A" / "8º B" / "6º A".
+   "3 ANO" → "3º ano" · "1º ANO A" / "8ºANOA" → "1º ano A" / "8º ano A" · "4º A" / "8ºB" / "6A" → "4º ano A" / "8º ano B" / "6º ano A".
    Nomes que não são série numérica (TURMA MULT, Infantil I…, EJA combinada) ficam como estão. */
 export const turmaRotulo = nome => {
   const s = String(nome || '').trim().replace(/°/g, 'º');
@@ -15,7 +15,7 @@ export const turmaRotulo = nome => {
   const m = comAno || semAno || colado;
   if (!m) return s;
   const resto = (m[2] || '').trim();
-  return `${Number(m[1])}º${resto ? ' ' + resto.toUpperCase() : ''}`;
+  return `${Number(m[1])}º ano${resto ? ' ' + resto.toUpperCase() : ''}`;
 };
 
 const RES_LABEL = { 1: 'Não atingiu', 2: 'Atingiu' };
